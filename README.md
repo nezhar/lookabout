@@ -6,7 +6,7 @@ An entry for the Hacktoberfest Open-Source AI Challenge, Week 1: Touch Grass.
 
 ## Build
 
-Needs JDK 17 or newer and the Android SDK (platform 36), with `ANDROID_HOME` set.
+Needs JDK 17 or newer and the Android SDK (platform 37), with `ANDROID_HOME` set.
 
 ```sh
 ./gradlew assembleDebug test

@@ -4,7 +4,7 @@
 # Everything lives under /opt because $HOME is a host mount at runtime.
 
 ARG CMDLINE_TOOLS=16111833
-ARG ANDROID_PLATFORM=android-36
+ARG ANDROID_PLATFORM=android-37.0
 ARG BUILD_TOOLS=36.0.0
 
 RUN apt-get update \

@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "dev.nezhar.lookabout"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "dev.nezhar.lookabout"

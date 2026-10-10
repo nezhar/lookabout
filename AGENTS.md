@@ -1,6 +1,6 @@
 # Working on Lookabout
 
-Android app, Kotlin and Jetpack Compose, one module (`app`). Package and application ID: `dev.nezhar.lookabout`. minSdk 31, compileSdk and targetSdk 36.
+Android app, Kotlin and Jetpack Compose, one module (`app`). Package and application ID: `dev.nezhar.lookabout`. minSdk 31, compileSdk 37 (Compose needs it), targetSdk 36.
 
 ## Building
 
