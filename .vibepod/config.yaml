@@ -1,0 +1,9 @@
+# Lookabout project settings for VibePod. The overlay in .vibepod/overlay/
+# adds the JDK and Android SDK; init points Java at the VibePod proxy.
+agents:
+  codex:
+    init:
+      - /opt/vibepod/java-proxy.sh
+  claude:
+    init:
+      - /opt/vibepod/java-proxy.sh
