@@ -7,15 +7,21 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -39,13 +45,17 @@ import dev.nezhar.lookabout.R
 import dev.nezhar.lookabout.largestThatFits
 import dev.nezhar.lookabout.ui.theme.Accepted
 import dev.nezhar.lookabout.ui.theme.AcceptedTint
+import dev.nezhar.lookabout.ui.theme.ButtonIconSize
 import dev.nezhar.lookabout.ui.theme.ChipRadius
 import dev.nezhar.lookabout.ui.theme.CorrectionExtra
 import dev.nezhar.lookabout.ui.theme.CorrectionFill
 import dev.nezhar.lookabout.ui.theme.CriterionRowHeight
+import dev.nezhar.lookabout.ui.theme.DisabledFill
+import dev.nezhar.lookabout.ui.theme.DisabledText
 import dev.nezhar.lookabout.ui.theme.ErrorCardHeight
 import dev.nezhar.lookabout.ui.theme.InactiveDot
 import dev.nezhar.lookabout.ui.theme.LastRowDivider
+import dev.nezhar.lookabout.ui.theme.MainButtonHeight
 import dev.nezhar.lookabout.ui.theme.NotYet
 import dev.nezhar.lookabout.ui.theme.NotYetTint
 import dev.nezhar.lookabout.ui.theme.PhotoRadius
@@ -53,9 +63,11 @@ import dev.nezhar.lookabout.ui.theme.ProgressDotGap
 import dev.nezhar.lookabout.ui.theme.ProgressDotSize
 import dev.nezhar.lookabout.ui.theme.RowDivider
 import dev.nezhar.lookabout.ui.theme.RowIconSize
+import dev.nezhar.lookabout.ui.theme.SecondaryActionHeight
 import dev.nezhar.lookabout.ui.theme.SecondaryText
 import dev.nezhar.lookabout.ui.theme.VerdictCircleSize
 import dev.nezhar.lookabout.ui.theme.VerdictIconSize
+import dev.nezhar.lookabout.ui.theme.button
 import dev.nezhar.lookabout.ui.theme.correction
 import dev.nezhar.lookabout.ui.theme.coverage
 import dev.nezhar.lookabout.ui.theme.criteria
@@ -258,5 +270,52 @@ fun KeepScreenOn() {
     DisposableEffect(view) {
         view.keepScreenOn = true
         onDispose { view.keepScreenOn = false }
+    }
+}
+
+/**
+ * The main button at the bottom of a screen: 56 dp high, full width, fully rounded, with [icon]
+ * before [label] when given. Disabled ("Getting the model ready", Make my list before the choices
+ * are complete) it turns grey.
+ */
+@Composable
+fun MainButton(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: Int? = null,
+    enabled: Boolean = true,
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        colors = ButtonDefaults.buttonColors(
+            disabledContainerColor = DisabledFill,
+            disabledContentColor = DisabledText,
+        ),
+        modifier = modifier
+            .fillMaxWidth()
+            .height(MainButtonHeight),
+    ) {
+        if (icon != null) {
+            Icon(
+                painter = painterResource(icon),
+                contentDescription = null,
+                modifier = Modifier.size(ButtonIconSize),
+            )
+            Spacer(Modifier.width(8.dp))
+        }
+        Text(label, style = MaterialTheme.typography.button)
+    }
+}
+
+/** The text-only secondary action under the main button ("New list", "Cancel"): primary, 48 dp high. */
+@Composable
+fun TextAction(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    TextButton(
+        onClick = onClick,
+        modifier = modifier.heightIn(min = SecondaryActionHeight),
+    ) {
+        Text(label, style = MaterialTheme.typography.button)
     }
 }

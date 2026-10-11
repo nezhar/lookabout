@@ -70,3 +70,48 @@ val Typography.caption: TextStyle get() = bodyMedium
 
 /** "Changed by you". */
 val Typography.correction: TextStyle get() = labelMedium
+
+// Read off the Setup, List and Summary screens (design/values.md, "Text without a deck style"),
+// so approximate. Where the 360 and 412 dp screens differ, [wide] picks the 412 size.
+
+/** "Lookabout", "Your list": about 28 sp, bold. */
+val Typography.screenTitle: TextStyle get() = headlineMedium
+
+/** "Making your list": the screen title size, medium. */
+val Typography.waitingTitle: TextStyle get() = headlineMedium.copy(fontWeight = FontWeight.Medium)
+
+/** Setup section labels "Pictures", "Topic", "Look up. What is the sky doing?": about 18 sp, medium. */
+val Typography.sectionLabel: TextStyle get() = titleMedium
+
+/** The numbers in the Setup segmented control: about 18 sp. */
+val Typography.segment: TextStyle get() = titleMedium
+
+/** Setup chip labels: about 15 sp, medium. */
+val Typography.chip: TextStyle get() = style(15.sp, 20.sp, FontWeight.Medium)
+
+/** The topic on List, "Autumn in the city": about 22 sp, medium. */
+val Typography.listTopic: TextStyle get() = style(22.sp, 28.sp, FontWeight.Medium)
+
+/** A picture on List: about 18 sp at 360 dp, 20 sp at 412 dp, regular. */
+fun Typography.listRow(wide: Boolean): TextStyle =
+    if (wide) style(20.sp, 26.sp, FontWeight.Normal) else style(18.sp, 24.sp, FontWeight.Normal)
+
+/** The number of a picture on List: about 16 sp, in the primary colour. */
+val Typography.listNumber: TextStyle get() = bodyLarge
+
+/** The topic on Summary: about 24 sp, bold. */
+val Typography.summaryTitle: TextStyle get() = headlineSmall
+
+/** "3 of 5 accepted": about 24 sp at 360 dp, 26 sp at 412 dp, bold. */
+fun Typography.summaryHeadline(wide: Boolean): TextStyle =
+    if (wide) style(26.sp, 32.sp, FontWeight.Bold) else headlineSmall
+
+/** "1. A reflection ..." on Summary: about 15 sp at 360 dp, 16 sp at 412 dp, medium. */
+fun Typography.summaryPrompt(wide: Boolean): TextStyle =
+    if (wide) style(16.sp, 20.sp, FontWeight.Medium) else style(15.sp, 17.sp, FontWeight.Medium)
+
+/** The per-photo line on Summary ("75% · 6 s", "Not checked"): about 13 sp. */
+val Typography.summaryDetail: TextStyle get() = style(13.sp, 16.sp, FontWeight.Normal)
+
+/** The words in Summary status chips ("Accepted", "Skipped"): about 13 sp, medium. */
+val Typography.summaryChip: TextStyle get() = style(13.sp, 18.sp, FontWeight.Medium)
