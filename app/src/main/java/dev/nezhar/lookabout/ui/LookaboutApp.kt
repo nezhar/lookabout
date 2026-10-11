@@ -33,7 +33,12 @@ fun LookaboutApp(viewModel: LookaboutViewModel = viewModel()) {
             .imePadding()
         val list = viewModel.list
         val walk = viewModel.walk
+        val writingCount = viewModel.writingCount
         when {
+            screen == Screen.List && writingCount != null -> ListProgress(
+                count = writingCount,
+                modifier = modifier,
+            )
             screen == Screen.List && list != null -> ListScreen(
                 list = list,
                 onStartWalk = viewModel::startWalk,
