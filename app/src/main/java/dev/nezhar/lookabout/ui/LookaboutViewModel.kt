@@ -24,6 +24,7 @@ import dev.nezhar.lookabout.copyToGallery
 import dev.nezhar.lookabout.listPrompt
 import dev.nezhar.lookabout.modelPath
 import dev.nezhar.lookabout.monthName
+import dev.nezhar.lookabout.sunHere
 import dev.nezhar.lookabout.timeOfDay
 import dev.nezhar.lookabout.waitsForPhoto
 import dev.nezhar.lookabout.walkNotice
@@ -137,10 +138,12 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
         writeJob?.cancel()
         writingCount = count
         val now = LocalDateTime.now()
-        val prompt = listPrompt(count, topic, sky, timeOfDay(now.hour), monthName(now.monthValue))
         val modelReady = model == ModelState.Ready
+        val app = getApplication<Application>()
         writeJob = viewModelScope.launch {
             val pictures = withContext(Dispatchers.Default) {
+                val sun = sunHere(app, System.currentTimeMillis())
+                val prompt = listPrompt(count, topic, sky, timeOfDay(now.hour), monthName(now.monthValue), sun)
                 writeList(prompt, count, ask = { text, seed ->
                     try {
                         check(modelReady) { "Model not loaded" }

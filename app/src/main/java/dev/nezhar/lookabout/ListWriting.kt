@@ -49,12 +49,20 @@ fun countWord(count: Int): String = countWords[count] ?: count.toString()
 /**
  * The prompt that asks the model for [count] pictures. Send it with a temperature of about 0.8,
  * up to 600 tokens and a new random seed on every call, so New list does not repeat itself.
+ * With [sun] (from [sunWords], such as "low in the south-west") a `Sun:` line follows the sky.
  */
-fun listPrompt(count: Int, topic: String, sky: String, timeOfDay: String, month: String): String =
+fun listPrompt(
+    count: Int,
+    topic: String,
+    sky: String,
+    timeOfDay: String,
+    month: String,
+    sun: String? = null,
+): String =
     """
     |You are setting a photo challenge for a walk.
     |Topic: ${topic.trim()}
-    |Sky: $sky. Time of day: $timeOfDay. Month: $month.
+    |Sky: $sky. Time of day: $timeOfDay. Month: $month.${sun?.let { "\nSun: $it." } ?: ""}
     |
     |Write exactly $count different pictures to take.
     |For each one, write a line that starts with "PICTURE:" and has at most 12 words.

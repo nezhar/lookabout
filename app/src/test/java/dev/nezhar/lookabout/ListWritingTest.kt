@@ -33,6 +33,16 @@ class ListWritingTest {
     }
 
     @Test
+    fun sunLineFollowsTheSkyLine() {
+        val without = listPrompt(4, "Reflections", "Overcast", "evening", "October")
+        val withSun = listPrompt(4, "Reflections", "Overcast", "evening", "October", "low in the south-west")
+        assertTrue(withSun.contains("Sky: Overcast. Time of day: evening. Month: October.\nSun: low in the south-west.\n\n"))
+        assertEquals(without, withSun.replace("Sun: low in the south-west.\n", ""))
+        assertEquals(without, listPrompt(4, "Reflections", "Overcast", "evening", "October", null))
+        assertTrue(!without.contains("Sun:"))
+    }
+
+    @Test
     fun timeOfDayFollowsTheHour() {
         assertEquals("night", timeOfDay(0))
         assertEquals("night", timeOfDay(4))
