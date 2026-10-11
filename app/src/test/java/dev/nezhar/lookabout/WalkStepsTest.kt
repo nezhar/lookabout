@@ -210,8 +210,8 @@ class WalkStepsTest {
     fun summaryHidesCheckAgainWhenNothingNeedsChecking() {
         assertFalse(offersCheckAgain(allChecked(), endCheckRunning = false))
         // A skipped picture has no photo to check.
-        val skipped = Walk.start("Reflections", "Rain", (1..2).map { Picture("P$it", questions) }, 0L, checkAtEnd = true)
-            .skip().skip()
+        val skipped = Walk.start("Reflections", "Rain", (1..3).map { Picture("P$it", questions) }, 0L, checkAtEnd = true)
+            .skip().skip().skip()
         assertFalse(offersCheckAgain(skipped, endCheckRunning = false))
     }
 
