@@ -22,18 +22,24 @@ import java.io.IOException
  *
  * The photo lands in a new file in the app's Pictures folder and comes back through [onPhoto].
  * When the camera is cancelled, returns nothing or cannot be opened, the empty file is deleted and
- * [onCancelled] is called. The target path is kept in saved state, so the result still matches
- * when Android recreates the screen while the camera app is in front.
+ * [onCancelled] is called. [onLaunch] gets the target file just before the camera opens. The
+ * target path is kept in saved state, so the result still matches when Android recreates the
+ * screen while the camera app is in front.
  *
  * Needs no CAMERA permission: the camera app takes the photo and writes it through a FileProvider
  * Uri.
  */
 @Composable
-fun rememberCameraHandoff(onPhoto: (File) -> Unit, onCancelled: () -> Unit = {}): () -> Unit {
+fun rememberCameraHandoff(
+    onPhoto: (File) -> Unit,
+    onCancelled: () -> Unit = {},
+    onLaunch: (File) -> Unit = {},
+): () -> Unit {
     val context = LocalContext.current.applicationContext
     var targetPath by rememberSaveable { mutableStateOf<String?>(null) }
     val currentOnPhoto by rememberUpdatedState(onPhoto)
     val currentOnCancelled by rememberUpdatedState(onCancelled)
+    val currentOnLaunch by rememberUpdatedState(onLaunch)
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
         val path = targetPath
@@ -70,6 +76,7 @@ fun rememberCameraHandoff(onPhoto: (File) -> Unit, onCancelled: () -> Unit = {})
             currentOnCancelled()
         } else {
             targetPath = target.file.path
+            currentOnLaunch(target.file)
             try {
                 launcher.launch(target.uri)
             } catch (e: ActivityNotFoundException) {
