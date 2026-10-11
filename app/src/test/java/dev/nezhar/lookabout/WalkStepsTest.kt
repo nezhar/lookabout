@@ -1,6 +1,8 @@
 package dev.nezhar.lookabout
 
+import dev.nezhar.lookabout.walk.Picture
 import dev.nezhar.lookabout.walk.Shot
+import dev.nezhar.lookabout.walk.Walk
 import dev.nezhar.lookabout.walk.builtInPictures
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -98,5 +100,76 @@ class WalkStepsTest {
         assertEquals(answers, answersToRecord(CheckResult(answers, 1800, "1 YES", null)))
         assertNull(answersToRecord(CheckResult.failed("No readable answer", 1800, "hmm")))
         assertNull(answersToRecord(CheckResult(listOf(true), 1800, "1 YES", null)))
+    }
+
+    private val questions = listOf("Q1?", "Q2?", "Q3?", "Q4?")
+
+    /** Five pictures checked at the end: photos on 1, 2, 4 and 5, the third skipped, past the last. */
+    private fun walkAtItsEnd(): Walk =
+        Walk.start("Reflections", "Rain", (1..5).map { Picture("Picture $it", questions) }, 0L, checkAtEnd = true)
+            .photoRequested("/p/1.jpg").photoTaken().nextPicture()
+            .photoRequested("/p/2.jpg").photoTaken().nextPicture()
+            .skip()
+            .photoRequested("/p/4.jpg").photoTaken().nextPicture()
+            .photoRequested("/p/5.jpg").photoTaken().nextPicture()
+
+    @Test
+    fun withCheckAtEndAnUncheckedPhotoShowsPhotoTaken() {
+        assertEquals(WalkStep.PhotoTaken, walkStep(withPhoto, checking = false, checkAtEnd = true))
+        assertEquals(WalkStep.NextPicture, walkStep(fresh, checking = false, checkAtEnd = true))
+        val accepted = withPhoto.withCheck(listOf(true, true, false, false), 2000)
+        assertEquals(WalkStep.Accepted, walkStep(accepted, checking = false, checkAtEnd = true))
+        val notYet = withPhoto.withCheck(listOf(true, false, false, false), 2000)
+        assertEquals(WalkStep.NotYet, walkStep(notYet, checking = false, checkAtEnd = true))
+    }
+
+    @Test
+    fun withoutCheckAtEndAnUncheckedPhotoNeverShowsPhotoTaken() {
+        assertEquals(WalkStep.NextPicture, walkStep(withPhoto, checking = false, checkAtEnd = false))
+        assertEquals(WalkStep.CheckPaused, walkStep(withPhoto, checking = false, paused = true))
+    }
+
+    @Test
+    fun theCheckAtEndRunsOncePastTheLastPictureBeforeSummary() {
+        val end = walkAtItsEnd()
+        assertTrue(checksAtEnd(end, onSummary = false))
+        assertFalse(checksAtEnd(end, onSummary = true))
+        // Still on a picture.
+        assertFalse(checksAtEnd(end.copy(currentIndex = 4), onSummary = false))
+        // A walk that checks each photo at once never checks at the end.
+        assertFalse(checksAtEnd(end.copy(checkAtEnd = false), onSummary = false))
+        assertEquals(listOf(0, 1, 3, 4), end.shotsToCheck)
+    }
+
+    @Test
+    fun aFailedCheckAtTheEndLeavesItsShotToCheck() {
+        // The second photo's check failed, so nothing was recorded for it; the others are checked.
+        val end = walkAtItsEnd()
+            .recordCheck(listOf(true, true, true, false), 1000, shotIndex = 0)
+            .recordCheck(listOf(false, false, false, true), 1000, shotIndex = 3)
+            .recordCheck(listOf(true, true, false, false), 1000, shotIndex = 4)
+        assertEquals(listOf(1), end.shotsToCheck)
+        assertFalse(end.shots[1].isChecked)
+        assertEquals("/p/2.jpg", end.shots[1].photoPath)
+    }
+
+    @Test
+    fun theEndCheckCountsOnlyPhotos() {
+        val end = walkAtItsEnd()
+        assertEquals("Checking 1 of 4", endCheckText(end, 0))
+        assertEquals("Checking 2 of 4", endCheckText(end, 1))
+        assertEquals("Checking 3 of 4", endCheckText(end, 3))
+        assertEquals("Checking 4 of 4", endCheckText(end, 4))
+    }
+
+    @Test
+    fun theEndCheckProgressCountsThePhotosBefore() {
+        val end = walkAtItsEnd()
+        assertEquals(0f, endCheckProgress(end, 0), 0f)
+        assertEquals(0.25f, endCheckProgress(end, 1), 0f)
+        assertEquals(0.5f, endCheckProgress(end, 3), 0f)
+        assertEquals(0.75f, endCheckProgress(end, 4), 0f)
+        val noPhotos = Walk.start("Reflections", "Rain", (1..3).map { Picture("P$it", questions) }, 0L, checkAtEnd = true)
+        assertEquals(0f, endCheckProgress(noPhotos, 0), 0f)
     }
 }

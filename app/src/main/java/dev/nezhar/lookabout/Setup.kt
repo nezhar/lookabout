@@ -52,6 +52,8 @@ const val MAX_OWN_TOPIC_CHARS = 30
  * @property ownTopic true when "Your own" is chosen.
  * @property ownText the "Your own" text as typed, at most [MAX_OWN_TOPIC_CHARS] characters.
  * @property sky the chosen sky, or null until one is chosen.
+ * @property checkAtEnd true when "Check photos at the end" is on: the walk takes every photo first
+ *   and checks them all at Finish walk.
  */
 data class SetupChoices(
     val count: Int = 5,
@@ -59,6 +61,7 @@ data class SetupChoices(
     val ownTopic: Boolean = false,
     val ownText: String = "",
     val sky: String? = null,
+    val checkAtEnd: Boolean = false,
 ) {
     /** The topic the list is made for: the trimmed "Your own" text or the chosen suggestion. */
     val topicText: String get() = if (ownTopic) ownText.trim() else topic
@@ -81,6 +84,8 @@ data class SetupChoices(
     fun withOwnText(text: String): SetupChoices = copy(ownText = text.take(MAX_OWN_TOPIC_CHARS))
 
     fun withSky(sky: String): SetupChoices = copy(sky = sky)
+
+    fun withCheckAtEnd(on: Boolean): SetupChoices = copy(checkAtEnd = on)
 }
 
 /** The challenge shown on List: the topic and sky from Setup and the pictures to find. */
@@ -89,6 +94,7 @@ data class ChallengeList(
     val sky: String,
     val pictures: List<Picture>,
 ) {
-    /** A new walk at its first picture. */
-    fun startWalk(startedAtMillis: Long): Walk = Walk.start(topic, sky, pictures, startedAtMillis)
+    /** A new walk at its first picture; with [checkAtEnd] its photos are checked at Finish walk. */
+    fun startWalk(startedAtMillis: Long, checkAtEnd: Boolean = false): Walk =
+        Walk.start(topic, sky, pictures, startedAtMillis, checkAtEnd)
 }

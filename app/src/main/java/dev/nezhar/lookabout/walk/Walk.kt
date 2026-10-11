@@ -3,6 +3,8 @@ package dev.nezhar.lookabout.walk
 /**
  * A photo walk: the topic and sky from Setup, the start time in epoch milliseconds, 3 to 6 shots,
  * the index of the current shot and the path of a photo the camera is taking, if any.
+ * With [checkAtEnd] the walker takes every photo first and the photos are checked one after
+ * another at Finish walk, instead of each right after it is taken.
  *
  * Immutable: every step returns an updated walk. [currentIndex] runs from 0 to `shots.size`;
  * `shots.size` means the walker has moved past the last shot, and [current] is then null.
@@ -14,6 +16,7 @@ data class Walk(
     val shots: List<Shot>,
     val currentIndex: Int = 0,
     val pendingPhotoPath: String? = null,
+    val checkAtEnd: Boolean = false,
 ) {
     init {
         require(shots.size in MIN_SHOTS..MAX_SHOTS) { "A walk has $MIN_SHOTS to $MAX_SHOTS shots, not ${shots.size}" }
@@ -71,9 +74,20 @@ data class Walk(
         return updateShot(currentIndex) { it.skipped() }.copy(currentIndex = currentIndex + 1)
     }
 
-    /** Next picture, or Finish walk on the last: move on, keeping the result. Only for a checked shot. */
+    /**
+     * True when Next picture (Finish walk on the last) may move on: the current shot is checked,
+     * or, with [checkAtEnd], it has a photo that waits for the check at the end.
+     */
+    val canMoveOn: Boolean
+        get() = current?.let { it.isChecked || (checkAtEnd && it.hasPhoto) } == true
+
+    /** Next picture, or Finish walk on the last: move on, keeping the result. Only when [canMoveOn]. */
     fun nextPicture(): Walk =
-        if (current?.isChecked == true) copy(currentIndex = currentIndex + 1) else this
+        if (canMoveOn) copy(currentIndex = currentIndex + 1) else this
+
+    /** The indices of the shots whose photo has no check yet, in walk order. */
+    val shotsToCheck: List<Int>
+        get() = shots.indices.filter { shots[it].hasPhoto && !shots[it].isChecked }
 
     private fun updateShot(index: Int, change: (Shot) -> Shot): Walk {
         if (index !in shots.indices) return this
@@ -85,12 +99,19 @@ data class Walk(
         const val MAX_SHOTS = 6
 
         /** A new walk at its first shot, one shot per picture. */
-        fun start(topic: String, sky: String, pictures: List<Picture>, startedAtMillis: Long): Walk =
+        fun start(
+            topic: String,
+            sky: String,
+            pictures: List<Picture>,
+            startedAtMillis: Long,
+            checkAtEnd: Boolean = false,
+        ): Walk =
             Walk(
                 topic = topic,
                 sky = sky,
                 startedAtMillis = startedAtMillis,
                 shots = pictures.map { Shot.of(it) },
+                checkAtEnd = checkAtEnd,
             )
     }
 }

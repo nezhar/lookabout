@@ -3,6 +3,7 @@ package dev.nezhar.lookabout.walk
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WalkJsonTest {
@@ -66,6 +67,38 @@ class WalkJsonTest {
     }
 
     @Test
+    fun aWalkCheckedAtEndRoundTripsInTheMiddleOfItsCheck() {
+        // Past the last picture, one photo checked and two still to check.
+        val walk = Walk.start("Reflections", "Rain", pictures(4), 7L, checkAtEnd = true)
+            .photoRequested("/pictures/photo-1.jpg").photoTaken().nextPicture()
+            .skip()
+            .photoRequested("/pictures/photo-3.jpg").photoTaken().nextPicture()
+            .photoRequested("/pictures/photo-4.jpg").photoTaken().nextPicture()
+            .recordCheck(listOf(true, true, false, false), 5_000L, shotIndex = 0)
+        assertEquals(4, walk.currentIndex)
+        assertTrue(walk.checkAtEnd)
+        assertEquals(listOf(2, 3), walk.shotsToCheck)
+
+        val saved = SavedWalk(walk, onSummary = false)
+        val back = roundTrip(saved)
+        assertEquals(saved, back)
+        assertEquals(listOf(2, 3), back!!.walk.shotsToCheck)
+    }
+
+    @Test
+    fun aWalkSavedBeforeCheckAtEndExistedLoadsWithItOff() {
+        val back = decodeSavedWalk(edited { remove("checkAtEnd") })
+        assertEquals(false, back?.walk?.checkAtEnd)
+    }
+
+    @Test
+    fun theCheckAtEndSettingIsSaved() {
+        val walk = Walk.start("Reflections", "Rain", pictures(3), 0L, checkAtEnd = true)
+        assertEquals(true, JSONObject(encodeSavedWalk(SavedWalk(walk, onSummary = false))).getBoolean("checkAtEnd"))
+        assertEquals(false, JSONObject(edited { }).getBoolean("checkAtEnd"))
+    }
+
+    @Test
     fun garbageIsNotLoaded() {
         listOf("", "not json", "null", "[]", "{}", "{\"version\": 1}", "{\"version\": \"x\"}").forEach {
             assertNull(it, decodeSavedWalk(it))
@@ -107,5 +140,6 @@ class WalkJsonTest {
         assertNull(decodeSavedWalk(edited { firstShot.put("outcome", "MAYBE") }))
         assertNull(decodeSavedWalk(edited { remove("topic") }))
         assertNull(decodeSavedWalk(edited { firstShot.put("checkMillis", "soon") }))
+        assertNull(decodeSavedWalk(edited { put("checkAtEnd", "soon") }))
     }
 }
