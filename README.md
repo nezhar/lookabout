@@ -15,9 +15,9 @@ An entry for the Hacktoberfest Open-Source AI Challenge, Week 1: Touch Grass.
 
 ## How to use Lookabout
 
-1. **Get the model.** The first time, Setup shows **Download the model (2.6 GB)**. Connect to Wi-Fi and tap it. The progress shows above the button, such as "Downloading the model: 42%", and **Cancel** stops it. The download goes on when you close the app. To push the file with adb instead, see [Put the model on the phone](#put-the-model-on-the-phone).
+1. **Get the model.** The first time, Setup shows **Download the model (2.6 GB)**. Connect to Wi-Fi and tap it. The progress shows in its place, such as "Downloading the model: 42%" with a progress bar, and **Cancel** stops it. The download goes on when you close the app. To push the file with adb instead, see [Put the model on the phone](#put-the-model-on-the-phone).
 2. **Wait for the model.** While it loads, the button reads **Getting the model ready**. If it cannot load, Setup says "Couldn't get the model ready." with **Try again**.
-3. **Choose on Setup.** Pick how many **Pictures** (3 to 6) and a **Topic**, or tap **Your own** and type one. Under **Look up. What is the sky doing?**, tap the sky you see. Tap **Use my location for the light** once if you want the list to fit where the sun is. Then tap **Make my list**; it works once a sky is chosen.
+3. **Choose on Setup.** Pick how many **Pictures** (3 to 6) and a **Topic**, or tap **Your own** and type one. Under **Look up. What is the sky doing?**, tap the sky you see. Tap **Use my location for the light** once if you want the list to fit where the sun is. Then tap **Make my list**; it works once a sky is chosen and, with **Your own**, a topic is typed.
 4. **Read your list.** "Making your list" shows while Gemma writes. Then **Your list** shows every picture to find. Tap **New list** for other pictures, or **Start walk**. On Android 13 and later, Start walk asks once whether Lookabout may post notifications.
 5. **Find a picture.** The screen shows where you are, such as "2 of 5", and the picture to find. Tap **Shoot** to open the camera app and take the photo. **Skip** moves on without one.
 6. **Wait for the check.** **Checking** shows while Gemma answers four yes/no questions about the photo; as the screen says, "You can keep looking around."
@@ -25,7 +25,7 @@ An entry for the Hacktoberfest Open-Source AI Challenge, Week 1: Touch Grass.
 8. **Fix a wrong answer.** Tap a check to change it; it then says "Changed by you" and the verdict follows. Tap it again to restore Gemma's answer.
 9. **Move on.** After Accepted, tap **Next picture**. After Not yet, tap **Retake** for a new photo, or **Skip** to keep this one and move on. If the check fails, **Check paused** says "Couldn't check this photo." with **Try again** and **Skip**.
 10. **Finish.** On the last picture the button reads **Finish walk**, and Skip finishes too.
-11. **See the results.** **Summary** shows the topic, the date, how many pictures were accepted, and each photo with its result: **Accepted**, **Not yet**, **Skipped** or **Not checked**. Under them, a line says how often you and Gemma agreed. **Check again** checks the photos marked Not checked once more. **New walk** goes back to Setup.
+11. **See the results.** The summary (**Your walk**) shows the topic, the date, how many pictures were accepted, and each photo with its result: **Accepted**, **Not yet**, **Skipped** or **Not checked**. Under them, a line says how often you and Gemma agreed. **Check again** checks the photos marked Not checked once more. **New walk** goes back to Setup.
 12. **Look back.** Once a walk is done, **Past walks** shows at the top of Setup. Tap a walk to open its Summary, and **Back** to return. Long-press a walk to delete it: "Delete this walk? Its photos stay in the gallery." with **Delete** and **Keep**. **Back to Setup** leaves the list.
 
 <p>
