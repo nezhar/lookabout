@@ -54,7 +54,7 @@ fun LookaboutApp(viewModel: LookaboutViewModel = viewModel()) {
             )
             screen == Screen.Summary && walk != null -> SummaryScreen(
                 walk = walk,
-                onNewWalk = viewModel::showSetup,
+                onNewWalk = viewModel::newWalk,
                 modifier = modifier,
             )
             screen == Screen.Debug -> DebugScreen(
