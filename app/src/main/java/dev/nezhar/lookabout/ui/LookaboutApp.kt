@@ -79,6 +79,12 @@ fun LookaboutApp(noticeTaps: Int = 0, viewModel: LookaboutViewModel = viewModel(
             )
             screen == Screen.Debug -> DebugScreen(
                 onBack = viewModel::showSetup,
+                canChooseModel = viewModel.canChooseModel,
+                modelChoice = viewModel.modelChoice,
+                modelChoiceEnabled = viewModel.model !is ModelState.Loading &&
+                    viewModel.model !is ModelState.Downloading,
+                modelChoiceMessage = viewModel.modelChoiceMessage,
+                onChooseModel = viewModel::chooseModel,
                 modifier = modifier,
             )
             else -> SetupScreen(

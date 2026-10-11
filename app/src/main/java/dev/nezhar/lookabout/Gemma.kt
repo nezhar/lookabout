@@ -13,7 +13,6 @@ import com.google.ai.edge.litertlm.ExperimentalApi
 import com.google.ai.edge.litertlm.ExperimentalFlags
 import com.google.ai.edge.litertlm.SamplerConfig
 import com.google.ai.edge.litertlm.ThinkingConfig
-import java.io.File
 
 /**
  * Owns the model for the app's lifetime.
@@ -37,10 +36,15 @@ object Gemma {
     var speculativeDecoding: Boolean = false
         private set
 
+    /** The loaded model file's path, null while no model is loaded. */
+    @Volatile
+    var loadedModelPath: String? = null
+        private set
+
     /**
-     * Loads the model once; later calls return at once. Tries the GPU with speculative decoding
-     * first, then the GPU without it, then the CPU without it, for both the main and the vision
-     * backend. Speculative decoding needs the MTP drafter in the model file.
+     * Loads the model once; later calls return at once, until [close]. Tries the GPU with
+     * speculative decoding first, then the GPU without it, then the CPU without it, for both the
+     * main and the vision backend. Speculative decoding needs the MTP drafter in the model file.
      */
     @Synchronized
     fun load(modelPath: String, cacheDir: String) {
@@ -61,6 +65,22 @@ object Gemma {
                 start(modelPath, cacheDir, Backend.CPU(), speculative = false)
             }
         }
+        loadedModelPath = modelPath
+    }
+
+    /**
+     * Closes the loaded engine, if any, and forgets its backend, so the next [load] loads a model
+     * again, e.g. another one. Waits for a running [ask] to finish.
+     */
+    @Synchronized
+    fun close() {
+        checkNotMainThread()
+        val loaded = engine ?: return
+        engine = null
+        backendName = null
+        speculativeDecoding = false
+        loadedModelPath = null
+        loaded.close()
     }
 
     @OptIn(ExperimentalApi::class)
@@ -139,10 +159,8 @@ object Gemma {
 }
 
 /**
- * The model file: the app's own files folder if the file is there (the in-app download puts it
- * there), otherwise the path used during development.
+ * The model file for the model chosen on the debug screen (E2B unless E4B was chosen on a phone
+ * with the memory and its file is there): the app's own files folder if the file is there (the
+ * in-app download puts E2B there), otherwise the path used during development.
  */
-fun modelPath(context: Context): String {
-    val own = File(context.filesDir, MODEL_FILE_NAME)
-    return if (own.exists()) own.path else "/data/local/tmp/llm/$MODEL_FILE_NAME"
-}
+fun modelPath(context: Context): String = modelFile(context, usableModelChoice(context)).path

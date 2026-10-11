@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.nezhar.lookabout.Gemma
+import dev.nezhar.lookabout.modelLabel
 import dev.nezhar.lookabout.modelPath
 import dev.nezhar.lookabout.ui.theme.LookaboutTheme
 import kotlinx.coroutines.CancellationException
@@ -36,6 +37,8 @@ sealed interface ModelTestState {
     data object Idle : ModelTestState
     data object Running : ModelTestState
     data class Done(
+        val model: String,
+        val modelPath: String,
         val backend: String,
         val speculativeDecoding: Boolean,
         val loadMs: Long,
@@ -46,8 +49,9 @@ sealed interface ModelTestState {
 }
 
 /**
- * Model test: loads Gemma, asks for READY and shows the backend, whether speculative decoding is
- * on, the load time, the reply and the answer time. Self-contained, so any screen can show it.
+ * Model test: loads Gemma, asks for READY and shows the loaded model and its file, the backend,
+ * whether speculative decoding is on, the load time, the reply and the answer time.
+ * Self-contained, so any screen can show it.
  */
 @Composable
 fun ModelTest(modifier: Modifier = Modifier) {
@@ -86,12 +90,14 @@ private fun runModelTest(modelPath: String, cacheDir: String): ModelTestState.Do
     val answered = SystemClock.elapsedRealtime()
     val backend = Gemma.backendName ?: "unknown"
     val speculative = Gemma.speculativeDecoding
+    val path = Gemma.loadedModelPath ?: modelPath
+    val model = modelLabel(path)
     Log.i(
         Gemma.TAG,
-        "Model test: $backend, speculative decoding ${onOff(speculative)}, " +
+        "Model test: $model ($path), $backend, speculative decoding ${onOff(speculative)}, " +
             "loaded in ${loaded - start} ms, replied \"$reply\" in ${answered - loaded} ms",
     )
-    return ModelTestState.Done(backend, speculative, loaded - start, reply, answered - loaded)
+    return ModelTestState.Done(model, path, backend, speculative, loaded - start, reply, answered - loaded)
 }
 
 private fun onOff(on: Boolean): String = if (on) "on" else "off"
@@ -116,7 +122,9 @@ fun ModelTestContent(
                 Text("Loading the model and asking for READY…")
             }
             is ModelTestState.Done -> Text(
-                "Backend: ${state.backend}\n" +
+                "Model: ${state.model}\n" +
+                    "File: ${state.modelPath}\n" +
+                    "Backend: ${state.backend}\n" +
                     "Speculative decoding: ${onOff(state.speculativeDecoding)}\n" +
                     "Load time: ${state.loadMs} ms\n" +
                     "Reply: \"${state.reply}\"\n" +
@@ -136,6 +144,8 @@ private fun ModelTestDonePreview() {
     LookaboutTheme {
         ModelTestContent(
             state = ModelTestState.Done(
+                model = "Gemma 4 E2B",
+                modelPath = "/data/local/tmp/llm/gemma-4-E2B-it.litertlm",
                 backend = "GPU",
                 speculativeDecoding = true,
                 loadMs = 9412,
