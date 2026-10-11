@@ -2,11 +2,15 @@ package dev.nezhar.lookabout.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,10 +23,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -139,11 +145,31 @@ fun VerdictHeader(accepted: Boolean, modifier: Modifier = Modifier) {
     }
 }
 
-/** One criterion with a tick (YES) or a cross (NO). At least 48 dp high. */
+/** The fill of a criterion whose answer the walker changed. */
+private val CorrectedFill = Color(0xFFDCECF2)
+
+/**
+ * One criterion with a tick (YES) or a cross (NO), showing the answer after the walker's
+ * correction. The whole row is the tap target: tapping it calls [onTap] to change the answer.
+ * A [corrected] row is filled, has rounded corners, reads "Changed by you" under the question and
+ * is 16 dp higher than an uncorrected one. At least 48 dp high (64 dp when corrected).
+ */
 @Composable
-fun CriterionRow(question: String, yes: Boolean, modifier: Modifier = Modifier) {
+fun CriterionRow(
+    question: String,
+    yes: Boolean,
+    corrected: Boolean,
+    onTap: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Row(
-        modifier = modifier.heightIn(min = 48.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = if (corrected) 64.dp else 48.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (corrected) CorrectedFill else Color.Transparent)
+            .clickable(onClickLabel = "Change the answer", role = Role.Button, onClick = onTap)
+            .padding(horizontal = 12.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -153,7 +179,16 @@ fun CriterionRow(question: String, yes: Boolean, modifier: Modifier = Modifier) 
             tint = if (yes) Accepted else NotYet,
             modifier = Modifier.size(24.dp),
         )
-        Text(question, style = MaterialTheme.typography.bodyLarge)
+        Column {
+            Text(question, style = MaterialTheme.typography.bodyLarge)
+            if (corrected) {
+                Text(
+                    "Changed by you",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
     }
 }
 

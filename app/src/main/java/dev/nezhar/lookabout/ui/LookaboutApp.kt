@@ -50,6 +50,7 @@ fun LookaboutApp(viewModel: LookaboutViewModel = viewModel()) {
                 onTryAgain = viewModel::tryAgain,
                 onNextPicture = viewModel::nextPicture,
                 onFinish = viewModel::finishWalk,
+                onFlip = viewModel::flip,
                 modifier = modifier,
             )
             screen == Screen.Summary && walk != null -> SummaryScreen(
