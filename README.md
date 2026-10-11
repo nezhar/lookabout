@@ -7,9 +7,11 @@ An entry for the Hacktoberfest Open-Source AI Challenge, Week 1: Touch Grass.
 ## How it works
 
 1. **Setup**: pick the number of pictures, a topic and what the sky is doing.
-2. **List**: the pictures to find, all shown up front. Draw a new list or start the walk.
-3. **Walk**: one picture at a time. Take a photo with the camera app, and Gemma answers four yes/no questions about it. Two or more YES answers and the photo is accepted; otherwise retake it or skip.
-4. **Summary**: how the walk went.
+2. **List**: Gemma writes the pictures to find from the topic, the sky, the time of day and the month, each with four yes/no questions. Any gap is filled from a built-in list, which is also used alone when the model is not loaded. All pictures are shown up front. Ask for a new list or start the walk.
+3. **Walk**: one picture at a time. Take a photo with the camera app, and Gemma answers the four questions about it. Two or more YES answers and the photo is accepted; otherwise retake it or skip. The phone buzzes with the verdict: one long pulse for Accepted, two short ones for Not yet. Tap a question to change Gemma's answer if it got it wrong (tap again to restore it); the verdict follows.
+4. **Summary**: the topic, the date and how many pictures were accepted, then each picture with its photo, its coverage (the share of YES answers) and how long the check took. A line says how often you and Gemma agreed, counting the answers you left unchanged.
+
+The walk is saved on the phone after every change, so it survives Android closing the app while the camera is open: the app opens where you left off and checks a photo taken in the meantime.
 
 Everything runs on the phone. The app has no INTERNET permission.
 
@@ -21,7 +23,7 @@ Needs JDK 17 or newer and the Android SDK (platform 37), with `ANDROID_HOME` set
 ./gradlew assembleDebug test
 ```
 
-The debug APK lands in `app/build/outputs/apk/debug/`. Every push and pull request is also built on GitHub Actions, which keeps the APK as a download on the run (`lookabout-debug-apk`).
+The debug APK lands in `app/build/outputs/apk/debug/`. Every push to `main` and every pull request is also built on GitHub Actions, which keeps the APK as a download on the run (`lookabout-debug-apk`).
 
 The app needs a real phone on Android 12 or later (minimum SDK 31).
 
