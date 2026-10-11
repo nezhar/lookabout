@@ -18,6 +18,7 @@ import dev.nezhar.lookabout.WalkStore
 import dev.nezhar.lookabout.answersToRecord
 import dev.nezhar.lookabout.backTarget
 import dev.nezhar.lookabout.checkPhoto
+import dev.nezhar.lookabout.copyToGallery
 import dev.nezhar.lookabout.listPrompt
 import dev.nezhar.lookabout.modelPath
 import dev.nezhar.lookabout.monthName
@@ -292,6 +293,7 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
             val pending = if (w.pendingPhotoPath == file.path) w else w.photoRequested(file.path)
             pending.photoTaken()
         }
+        viewModelScope.launch(Dispatchers.IO) { copyToGallery(getApplication<Application>(), file) }
         checkCurrentPhoto()
     }
 
