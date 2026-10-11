@@ -4,7 +4,9 @@ import android.util.Log
 import dev.nezhar.lookabout.walk.SavedWalk
 import dev.nezhar.lookabout.walk.decodeSavedWalk
 import dev.nezhar.lookabout.walk.encodeSavedWalk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
@@ -23,7 +25,8 @@ const val WALK_FILE_NAME = "walk.json"
  *
  * [save] writes in the background, one write at a time, and the latest call wins: a write that
  * is overtaken by a newer one before it starts is dropped. Each write goes to a temporary file
- * that is then renamed over [file], so a reader never sees half a walk.
+ * that is then renamed over [file], so a reader never sees half a walk. The result of [save]
+ * completes once the file holds that save or a newer one.
  */
 class WalkStore(private val file: File) {
     private val tempFile = File(file.path + ".tmp")
@@ -32,6 +35,9 @@ class WalkStore(private val file: File) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lock = Mutex()
     private val latest = AtomicLong()
+
+    // Saves not finished yet, by number; guarded by itself.
+    private val waiting = ArrayList<Pair<Long, CompletableDeferred<Boolean>>>()
 
     /** The saved walk, or null when there is none or the file cannot be read. Blocks: the file is small. */
     fun load(): SavedWalk? =
@@ -42,25 +48,55 @@ class WalkStore(private val file: File) {
             null
         }
 
-    /** Saves [saved] in the background, or deletes the saved walk when it is null. A failed save is only logged. */
-    fun save(saved: SavedWalk?) {
+    /**
+     * Every photo the saved walk references (its shots' photos and the pending one), empty when no
+     * walk is saved, or null when the file is there but cannot be read. Blocks: the file is small.
+     */
+    fun photoPaths(): Set<String>? {
+        if (!file.isFile) return emptySet()
+        val walk = load()?.walk ?: return null
+        return walkPhotoPaths(walk)
+    }
+
+    /**
+     * Saves [saved] in the background, or deletes the saved walk when it is null. A failed save is
+     * only logged. The result completes with true once the file holds this save or a newer one,
+     * and with false when that write failed or this save could not be encoded.
+     */
+    fun save(saved: SavedWalk?): Deferred<Boolean> {
+        val done = CompletableDeferred<Boolean>()
         val text = try {
             saved?.let(::encodeSavedWalk)
         } catch (e: Exception) {
             Log.w(Gemma.TAG, "Could not save the walk", e)
-            return
+            done.complete(false)
+            return done
         }
-        val write = latest.incrementAndGet()
+        val write = synchronized(waiting) {
+            latest.incrementAndGet().also { waiting += it to done }
+        }
         scope.launch {
             lock.withLock {
                 if (latest.get() != write) return@withLock
-                try {
+                val written = try {
                     if (text == null) clear() else writeAtomically(text)
+                    true
                 } catch (e: Exception) {
                     Log.w(Gemma.TAG, "Could not save the walk", e)
+                    false
                 }
+                finish(write, written)
             }
         }
+        return done
+    }
+
+    /** Completes every save up to number [write], which the file now holds or a newer one overtook. */
+    private fun finish(write: Long, written: Boolean) {
+        val finished = synchronized(waiting) {
+            waiting.filter { it.first <= write }.also { waiting.removeAll(it.toSet()) }
+        }
+        finished.forEach { it.second.complete(written) }
     }
 
     private fun writeAtomically(text: String) {
