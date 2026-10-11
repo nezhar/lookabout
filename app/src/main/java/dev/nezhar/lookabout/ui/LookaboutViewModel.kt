@@ -236,11 +236,18 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
 
     /**
      * System Back: List, Summary and Debug return to Setup; a walk ignores it. Leaving List stops
-     * the list being written.
+     * the list being written; leaving Summary is New walk, so the finished walk is not reopened.
      */
     fun back() {
         val target = screen.backTarget ?: return
-        if (screen == Screen.List) stopWriting()
+        when (screen) {
+            Screen.List -> stopWriting()
+            Screen.Summary -> {
+                newWalk()
+                return
+            }
+            else -> {}
+        }
         screen = target
     }
 
