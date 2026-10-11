@@ -60,9 +60,12 @@ fun LookaboutApp(noticeTaps: Int = 0, viewModel: LookaboutViewModel = viewModel(
                 onNewList = viewModel::newList,
                 modifier = modifier,
             )
-            screen == Screen.Walk && walk != null && endCheckIndex != null -> EndCheckScreen(
+            // The check at the end after Finish walk, or Check again from Summary.
+            (screen == Screen.Walk || screen == Screen.Summary) && walk != null && endCheckIndex != null -> EndCheckScreen(
                 walk = walk,
                 shotIndex = endCheckIndex,
+                waitingForModel = viewModel.endCheckWaiting,
+                modelUnavailable = viewModel.modelUnavailable,
                 modifier = modifier,
             )
             screen == Screen.Walk && walk != null -> WalkScreen(
@@ -81,6 +84,8 @@ fun LookaboutApp(noticeTaps: Int = 0, viewModel: LookaboutViewModel = viewModel(
             screen == Screen.Summary && walk != null -> SummaryScreen(
                 walk = walk,
                 onNewWalk = viewModel::newWalk,
+                canCheckAgain = viewModel.canCheckAgain,
+                onCheckAgain = viewModel::checkAgain,
                 modifier = modifier,
             )
             screen == Screen.Debug -> DebugScreen(

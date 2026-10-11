@@ -26,7 +26,8 @@ import androidx.compose.ui.unit.dp
 import dev.nezhar.lookabout.WalkStep
 import dev.nezhar.lookabout.coverageText
 import dev.nezhar.lookabout.endCheckProgress
-import dev.nezhar.lookabout.endCheckText
+import dev.nezhar.lookabout.endCheckTitle
+import dev.nezhar.lookabout.modelWaitNote
 import dev.nezhar.lookabout.positionText
 import dev.nezhar.lookabout.ui.theme.LookaboutTheme
 import dev.nezhar.lookabout.walk.Picture
@@ -121,12 +122,22 @@ fun WalkScreen(
 
 /**
  * The check at the end of the walk: "Checking 2 of 5" with a spinner, how far the check is, and
- * the picture and photo being checked. No actions; the screen stays on.
+ * the picture and photo being checked. Until the model is ready it says "Getting the model ready"
+ * instead. No actions; the screen stays on.
  *
- * @param shotIndex the shot whose photo is being checked.
+ * @param shotIndex the shot whose photo is being checked, or checked first once the model is ready.
+ * @param waitingForModel true while the check waits for the model.
+ * @param modelUnavailable true when the model is not on the phone or failed to load; a waiting
+ *   check says so under the heading.
  */
 @Composable
-fun EndCheckScreen(walk: Walk, shotIndex: Int, modifier: Modifier = Modifier) {
+fun EndCheckScreen(
+    walk: Walk,
+    shotIndex: Int,
+    modifier: Modifier = Modifier,
+    waitingForModel: Boolean = false,
+    modelUnavailable: Boolean = false,
+) {
     KeepScreenOn()
     val shot = walk.shots.getOrNull(shotIndex)
     Column(
@@ -140,7 +151,15 @@ fun EndCheckScreen(walk: Walk, shotIndex: Int, modifier: Modifier = Modifier) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             CircularProgressIndicator(modifier = Modifier.size(32.dp))
-            Text(endCheckText(walk, shotIndex), style = MaterialTheme.typography.headlineMedium)
+            Text(endCheckTitle(walk, shotIndex, waitingForModel), style = MaterialTheme.typography.headlineMedium)
+        }
+        val note = if (waitingForModel) modelWaitNote(modelUnavailable) else null
+        if (note != null) {
+            Text(
+                note,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         LinearProgressIndicator(
             progress = { endCheckProgress(walk, shotIndex) },
@@ -476,6 +495,15 @@ private fun EndCheckPreview() {
     val walk = previewWalk().copy(checkAtEnd = true).withPreviewPhoto().copy(currentIndex = 5)
     LookaboutTheme {
         EndCheckScreen(walk, shotIndex = 1)
+    }
+}
+
+@Preview(showBackground = true, widthDp = 360, heightDp = 800)
+@Composable
+private fun EndCheckWaitingPreview() {
+    val walk = previewWalk().copy(checkAtEnd = true).withPreviewPhoto().copy(currentIndex = 5)
+    LookaboutTheme {
+        EndCheckScreen(walk, shotIndex = 1, waitingForModel = true, modelUnavailable = true)
     }
 }
 
