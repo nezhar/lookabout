@@ -4,16 +4,51 @@ Lookabout is an Android app for photo walks. It sets a challenge of 3 to 6 pictu
 
 An entry for the Hacktoberfest Open-Source AI Challenge, Week 1: Touch Grass.
 
+<p>
+  <img src="design/screens/setup-412.png" width="200" alt="Setup: 5 pictures, the topic Autumn in the city, the sky Overcast and Make my list">
+  <img src="design/screens/loop-412-next-picture.png" width="200" alt="Next picture: 2 of 5, Fallen leaves on something man-made, with Shoot and Skip">
+  <img src="design/screens/loop-412-accepted.png" width="200" alt="Accepted: 75%, 3 of 4, the photo of a reflection and its four checks">
+  <img src="design/screens/summary-412.png" width="200" alt="Summary: Autumn in the city, 3 of 5 accepted, one row per picture">
+</p>
+
+*The designer's screens, with sample photos. Screenshots from a real walk will follow.*
+
+## How to use Lookabout
+
+1. **Get the model.** The first time, Setup shows **Download the model (2.6 GB)**. Connect to Wi-Fi and tap it. The progress shows above the button, such as "Downloading the model: 42%", and **Cancel** stops it. The download goes on when you close the app. To push the file with adb instead, see [Put the model on the phone](#put-the-model-on-the-phone).
+2. **Wait for the model.** While it loads, the button reads **Getting the model ready**. If it cannot load, Setup says "Couldn't get the model ready." with **Try again**.
+3. **Choose on Setup.** Pick how many **Pictures** (3 to 6) and a **Topic**, or tap **Your own** and type one. Under **Look up. What is the sky doing?**, tap the sky you see. Tap **Use my location for the light** once if you want the list to fit where the sun is. Then tap **Make my list**; it works once a sky is chosen.
+4. **Read your list.** "Making your list" shows while Gemma writes. Then **Your list** shows every picture to find. Tap **New list** for other pictures, or **Start walk**. On Android 13 and later, Start walk asks once whether Lookabout may post notifications.
+5. **Find a picture.** The screen shows where you are, such as "2 of 5", and the picture to find. Tap **Shoot** to open the camera app and take the photo. **Skip** moves on without one.
+6. **Wait for the check.** **Checking** shows while Gemma answers four yes/no questions about the photo; as the screen says, "You can keep looking around."
+7. **Read the verdict.** **Accepted** or **Not yet**, with the share of YES answers ("75%, 3 of 4"), the photo and the four checks. The phone buzzes: one long pulse for Accepted, two short ones for Not yet.
+8. **Fix a wrong answer.** Tap a check to change it; it then says "Changed by you" and the verdict follows. Tap it again to restore Gemma's answer.
+9. **Move on.** After Accepted, tap **Next picture**. After Not yet, tap **Retake** for a new photo, or **Skip** to keep this one and move on. If the check fails, **Check paused** says "Couldn't check this photo." with **Try again** and **Skip**.
+10. **Finish.** On the last picture the button reads **Finish walk**, and Skip finishes too.
+11. **See the results.** **Summary** shows the topic, the date, how many pictures were accepted, and each photo with its result: **Accepted**, **Not yet**, **Skipped** or **Not checked**. Under them, a line says how often you and Gemma agreed. **Check again** checks the photos marked Not checked once more. **New walk** goes back to Setup.
+12. **Look back.** Once a walk is done, **Past walks** shows at the top of Setup. Tap a walk to open its Summary, and **Back** to return. Long-press a walk to delete it: "Delete this walk? Its photos stay in the gallery." with **Delete** and **Keep**. **Back to Setup** leaves the list.
+
+<p>
+  <img src="design/screens/correction-360-before.png" width="200" alt="Not yet, 25%, 1 of 4: Is the sky visible? is marked No">
+  <img src="design/screens/correction-360-after.png" width="200" alt="After a tap on that check: Accepted, 50%, 2 of 4, with Changed by you under it">
+</p>
+
+*Step 8 in the designer's screens: one tap on a wrong check turns Not yet into Accepted.*
+
+Along the way:
+
+- **Lock screen**: during a walk, a silent notice shows the current picture and "2 of 5", also on the lock screen. Tap it to go back to the walk, straight into the camera when the picture still needs its photo. Without the notification permission from step 4 there is no notice.
+- **Gallery**: every photo is also copied to the phone's gallery, in `Pictures/Lookabout`, to edit and share from there.
+- **Check photos at the end**: turn this on in Setup to shoot without waiting. After Shoot, **Photo taken** says "Checked at the end of the walk." with **Next picture** and **Retake**. At **Finish walk** every photo is checked one after another ("Checking 2 of 5"), then Summary opens.
+- **Debug screens**: long-press the **Lookabout** title on Setup (see [Debug screens](#debug-screens)).
+
 ## How it works
 
-1. **Setup**: pick the number of pictures, a topic and what the sky is doing. On first start, Setup offers to download the model (2.6 GB, Wi-Fi only, once); the progress shows there and the download can be cancelled. Under the sky choice, **Use my location for the light** asks once for your rough location. Setup also has a **Check photos at the end** switch (see below).
-2. **List**: Gemma writes the pictures to find from the topic, the sky, the time of day and the month, each with four yes/no questions. If you allowed location, the prompt also gets a line saying where the sun is, such as "low in the south-west", worked out on the phone from the last known coarse location; the location is not stored. Any gap is filled from a built-in list, which is also used alone when the model is not loaded. All pictures are shown up front. Ask for a new list or start the walk.
-3. **Walk**: one picture at a time. Take a photo with the camera app, and Gemma answers the four questions about it. Two or more YES answers and the photo is accepted; otherwise retake it or skip. The phone buzzes with the verdict: one long pulse for Accepted, two short ones for Not yet. Tap a question to change Gemma's answer if it got it wrong (tap again to restore it); the verdict follows. Each photo is also copied to the phone's gallery, in `Pictures/Lookabout`, so you can edit and share it from there.
-4. **Summary**: the topic, the date and how many pictures were accepted, then each picture with its photo, its coverage (the share of YES answers) and how long the check took. A line says how often you and Gemma agreed, counting the answers you left unchanged.
+Gemma writes the pictures from the topic, the sky, the time of day and the month, each with four yes/no questions. If you allowed location, the prompt also gets a line saying where the sun is, such as "low in the south-west", worked out on the phone from the last known coarse location; the location is not stored. Any gap is filled from a built-in list, which is also used alone when the model is not loaded.
 
-With **Check photos at the end** on, the walk does not wait for Gemma: take a photo, go to the next picture, and at **Finish walk** every photo is checked one after another ("Checking 2 of 5"). If the model is not ready yet, the check waits for it ("Getting the model ready") and starts by itself once it is. A model that failed to load is tried once more; if it is not on the phone or still fails, **Show results now** opens Summary without the check. A photo whose check fails shows **Not checked** on Summary, where **Check again** checks those photos once more.
+A photo with two or more YES answers is accepted. The coverage on Summary is the share of YES answers, next to how long the check took. The agreement line counts the answers you left unchanged.
 
-During a walk, a silent notice, also shown on the lock screen, shows the current picture and its position, such as "2 of 5". Tapping it opens the walk, and the camera when the picture still needs its photo. Start walk asks once for permission to post notifications (Android 13 and later); without it there is no notice.
+With **Check photos at the end** on, the walk does not wait for Gemma. If the model is not ready at Finish walk, the check waits for it ("Getting the model ready") and starts by itself once it is. A model that failed to load is tried once more; if it is not on the phone or still fails, **Show results now** opens Summary without the check. A photo whose check fails shows **Not checked** on Summary, where **Check again** checks it once more.
 
 The walk is saved on the phone after every change, so it survives Android closing the app while the camera is open: the app opens where you left off and checks a photo taken in the meantime. With **Check photos at the end** on, that photo is checked at **Finish walk** with the others instead, and a walk closed during the check at the end picks it up again.
 
