@@ -1,11 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Placeholder until the designed icon lands (PW-29). -->
+<!-- Redrawn from design/icon.png: the 512 px source maps onto the 72 dp visible area (512 px = 72 dp, offset 18 dp). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Viewfinder corners -->
     <path
-        android:fillColor="#3DDC84"
-        android:pathData="M54,36a18,18 0,1 1,0 36a18,18 0,1 1,0 -36z" />
+        android:pathData="M37.69,46.69 L37.69,38.53 L43.88,38.53 M64.12,38.53 L70.31,38.53 L70.31,46.69 M37.69,61.31 L37.69,69.47 L43.88,69.47 M64.12,69.47 L70.31,69.47 L70.31,61.31"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.8125"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <!-- Leaf with the midrib cut out -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M59.14,47.6 C51.36,46.34 45.66,52.01 48.26,60.26 C55.2,61.16 61.72,55.14 59.14,47.6 Z M49.14,59.67 L58.72,49.55 L57.7,48.58 L48.12,58.7 Z" />
 </vector>
