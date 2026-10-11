@@ -13,10 +13,13 @@ import dev.nezhar.lookabout.Screen
 import dev.nezhar.lookabout.STAND_IN_CHECK_MILLIS
 import dev.nezhar.lookabout.SetupChoices
 import dev.nezhar.lookabout.backTarget
+import dev.nezhar.lookabout.listPrompt
 import dev.nezhar.lookabout.modelPath
 import dev.nezhar.lookabout.standInAnswers
+import dev.nezhar.lookabout.monthName
+import dev.nezhar.lookabout.timeOfDay
 import dev.nezhar.lookabout.walk.Walk
-import dev.nezhar.lookabout.walk.pickBuiltInPictures
+import dev.nezhar.lookabout.writeList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -24,6 +27,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.time.LocalDateTime
 
 /** Where loading the model stands. */
 sealed interface ModelState {
@@ -47,6 +51,10 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
     var list by mutableStateOf<ChallengeList?>(null)
         private set
 
+    /** The number of pictures Gemma is writing for List, null while no list is being written. */
+    var writingCount by mutableStateOf<Int?>(null)
+        private set
+
     /** The walk in progress or just finished, null until Start walk. */
     var walk by mutableStateOf<Walk?>(null)
         private set
@@ -55,6 +63,8 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
         private set
 
     private var loadJob: Job? = null
+
+    private var writeJob: Job? = null
 
     init {
         loadModel()
@@ -84,19 +94,47 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
         setup = choices
     }
 
-    /** Make my list: draws the pictures and shows List. */
+    /** Make my list: shows List, which shows progress while Gemma writes the pictures. */
     fun makeList() {
         val choices = setup
         val sky = choices.sky
         if (!choices.canMakeList(model == ModelState.Ready) || sky == null) return
-        list = ChallengeList(choices.topicText, sky, pickBuiltInPictures(choices.count))
+        startWriting(choices.topicText, sky, choices.count)
         screen = Screen.List
     }
 
-    /** New list: draws the pictures again for the same topic, sky and count. */
+    /** New list: Gemma writes the pictures again for the same topic, sky and count. */
     fun newList() {
         val current = list ?: return
-        list = current.copy(pictures = pickBuiltInPictures(current.pictures.size))
+        startWriting(current.topic, current.sky, current.pictures.size)
+    }
+
+    /**
+     * Has Gemma write [count] pictures off the main thread, filling any gap from the built-in
+     * list, then puts them on List. A newer call cancels an older one, so a stale list never
+     * lands. Without a loaded model the built-in list is used alone.
+     */
+    private fun startWriting(topic: String, sky: String, count: Int) {
+        writeJob?.cancel()
+        writingCount = count
+        val now = LocalDateTime.now()
+        val prompt = listPrompt(count, topic, sky, timeOfDay(now.hour), monthName(now.monthValue))
+        val modelReady = model == ModelState.Ready
+        writeJob = viewModelScope.launch {
+            val pictures = withContext(Dispatchers.Default) {
+                writeList(prompt, count, ask = { text, seed ->
+                    try {
+                        check(modelReady) { "Model not loaded" }
+                        Gemma.ask(text, temperature = 0.8, maxTokens = 600, seed = seed)
+                    } catch (e: Exception) {
+                        Log.w(Gemma.TAG, "Could not write the list", e)
+                        throw e
+                    }
+                })
+            }
+            list = ChallengeList(topic, sky, pictures)
+            writingCount = null
+        }
     }
 
     /** Start walk: a new walk from the list, shown on Walk. */
