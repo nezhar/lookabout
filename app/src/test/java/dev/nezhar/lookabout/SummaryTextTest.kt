@@ -4,6 +4,7 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.Locale
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class SummaryTextTest {
@@ -41,5 +42,17 @@ class SummaryTextTest {
     fun totalReadsAcceptedOfAll() {
         assertEquals("3 of 5 accepted", acceptedTotalText(3, 5))
         assertEquals("0 of 6 accepted", acceptedTotalText(0, 6))
+    }
+
+    @Test
+    fun agreementReadsAgreedOfChecks() {
+        assertEquals("Gemma and you agreed on 15 of 16 checks", agreementText(15, 16))
+        assertEquals("Gemma and you agreed on 0 of 4 checks", agreementText(0, 4))
+        assertEquals("Gemma and you agreed on 4 of 4 checks", agreementText(4, 4))
+    }
+
+    @Test
+    fun agreementIsHiddenWithoutCheckedPhotos() {
+        assertNull(agreementText(0, 0))
     }
 }

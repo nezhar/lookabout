@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -61,7 +62,7 @@ sealed interface CheckState {
 
 /**
  * The photo check debug screen: four editable questions, a photo from the system picker (no
- * storage permission) and the check's answers, coverage, verdict and model time.
+ * storage permission) or the camera app, and the check's answers, coverage, verdict and model time.
  *
  * Self-contained, but not scrollable itself: put it in a scrolling container.
  */
@@ -88,6 +89,8 @@ fun CheckScreen(modifier: Modifier = Modifier) {
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) startCheck(uri)
     }
+    // The camera photo stays in the app's Pictures folder.
+    val takePhoto = rememberCameraHandoff(onPhoto = { file -> startCheck(Uri.fromFile(file)) })
 
     // A small preview, decoded off the main thread.
     LaunchedEffect(photo) {
@@ -115,6 +118,7 @@ fun CheckScreen(modifier: Modifier = Modifier) {
         onPick = {
             picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         },
+        onTakePhoto = takePhoto,
         onCheckAgain = photo?.let { uri -> { startCheck(uri) } },
         modifier = modifier,
     )
@@ -130,6 +134,7 @@ fun CheckContent(
     preview: ImageBitmap?,
     state: CheckState,
     onPick: () -> Unit,
+    onTakePhoto: () -> Unit,
     onCheckAgain: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
@@ -146,9 +151,15 @@ fun CheckContent(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             Button(onClick = onPick, enabled = !running) {
                 Text("Pick photo")
+            }
+            Button(onClick = onTakePhoto, enabled = !running) {
+                Text("Take photo")
             }
             if (onCheckAgain != null) {
                 OutlinedButton(onClick = onCheckAgain, enabled = !running) {
@@ -211,6 +222,7 @@ private fun CheckContentDonePreview() {
                 CheckResult(listOf(false, true, true, true), 2840, "1: NO\n2: YES\n3: YES\n4: YES", null),
             ),
             onPick = {},
+            onTakePhoto = {},
             onCheckAgain = {},
         )
     }
@@ -226,6 +238,7 @@ private fun CheckContentFailedPreview() {
             preview = null,
             state = CheckState.Done(DEFAULT_CHECK_QUESTIONS, CheckResult.failed("Model not loaded")),
             onPick = {},
+            onTakePhoto = {},
             onCheckAgain = null,
         )
     }

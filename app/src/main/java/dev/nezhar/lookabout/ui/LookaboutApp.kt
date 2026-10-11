@@ -18,6 +18,13 @@ fun LookaboutApp(viewModel: LookaboutViewModel = viewModel()) {
     val screen = viewModel.screen
     // On Setup Back is not handled, so it leaves the app; during a walk it is consumed and ignored.
     BackHandler(enabled = screen.backTarget != null) { viewModel.back() }
+    // Shoot and Retake on Walk hand off to the camera app; the result goes to the ViewModel.
+    val openCamera = rememberCameraHandoff(
+        onPhoto = viewModel::photoTaken,
+        onCancelled = viewModel::cameraCancelled,
+        onLaunch = viewModel::photoRequested,
+    )
+    val takePhoto: () -> Unit = { if (viewModel.canTakePhoto) openCamera() }
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         val modifier = Modifier
@@ -26,7 +33,12 @@ fun LookaboutApp(viewModel: LookaboutViewModel = viewModel()) {
             .imePadding()
         val list = viewModel.list
         val walk = viewModel.walk
+        val writingCount = viewModel.writingCount
         when {
+            screen == Screen.List && writingCount != null -> ListProgress(
+                count = writingCount,
+                modifier = modifier,
+            )
             screen == Screen.List && list != null -> ListScreen(
                 list = list,
                 onStartWalk = viewModel::startWalk,
@@ -35,13 +47,20 @@ fun LookaboutApp(viewModel: LookaboutViewModel = viewModel()) {
             )
             screen == Screen.Walk && walk != null -> WalkScreen(
                 walk = walk,
-                onWalkChange = { updated -> viewModel.updateWalk { updated } },
+                checking = viewModel.checking,
+                checkPaused = viewModel.checkPaused,
+                onShoot = takePhoto,
+                onSkip = viewModel::skip,
+                onRetake = takePhoto,
+                onTryAgain = viewModel::tryAgain,
+                onNextPicture = viewModel::nextPicture,
                 onFinish = viewModel::finishWalk,
+                onFlip = viewModel::flip,
                 modifier = modifier,
             )
             screen == Screen.Summary && walk != null -> SummaryScreen(
                 walk = walk,
-                onNewWalk = viewModel::showSetup,
+                onNewWalk = viewModel::newWalk,
                 modifier = modifier,
             )
             screen == Screen.Debug -> DebugScreen(
