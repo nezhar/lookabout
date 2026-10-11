@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.nezhar.lookabout.ChallengeList
@@ -14,6 +15,7 @@ import dev.nezhar.lookabout.PausedCheck
 import dev.nezhar.lookabout.Screen
 import dev.nezhar.lookabout.SetupChoices
 import dev.nezhar.lookabout.WALK_FILE_NAME
+import dev.nezhar.lookabout.WalkNotifier
 import dev.nezhar.lookabout.WalkStore
 import dev.nezhar.lookabout.answersToRecord
 import dev.nezhar.lookabout.backTarget
@@ -22,6 +24,8 @@ import dev.nezhar.lookabout.listPrompt
 import dev.nezhar.lookabout.modelPath
 import dev.nezhar.lookabout.monthName
 import dev.nezhar.lookabout.timeOfDay
+import dev.nezhar.lookabout.waitsForPhoto
+import dev.nezhar.lookabout.walkNotice
 import dev.nezhar.lookabout.walk.SavedWalk
 import dev.nezhar.lookabout.walk.Walk
 import dev.nezhar.lookabout.walk.isAccepted
@@ -356,6 +360,25 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
     fun flip(questionIndex: Int) {
         if (checking) return
         updateWalk { it.flip(questionIndex) }
+    }
+
+    private val walkNotifier = WalkNotifier(application)
+
+    /** True when the current picture on Walk waits for its photo: a tap on the walk notice opens the camera. */
+    val waitsForPhoto: Boolean
+        get() = screen == Screen.Walk && !checking && walk?.waitsForPhoto() == true
+
+    /** Posts, updates or removes the walk notice for the current walk and screen, e.g. once notifications are allowed. */
+    fun refreshWalkNotice() {
+        walkNotifier.show(walkNotice(walk, screen))
+    }
+
+    // The walk notice follows the current picture and is removed on Summary and New walk. Dispatched
+    // after the ViewModel is created, so it reads the state once the restored walk is in.
+    init {
+        viewModelScope.launch(Dispatchers.Main) {
+            snapshotFlow { walkNotice(walk, screen) }.collect { walkNotifier.show(it) }
+        }
     }
 
     // Last in the class: restoring may start a check, which needs every property above.

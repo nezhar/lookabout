@@ -7,14 +7,19 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.nezhar.lookabout.Screen
 import dev.nezhar.lookabout.backTarget
 
-/** The app shell: the ViewModel's screen value decides which screen shows. */
+/**
+ * The app shell: the ViewModel's screen value decides which screen shows. [noticeTaps] counts taps
+ * on the walk notice since the activity was created; each new tap opens the camera when the
+ * current picture waits for its photo.
+ */
 @Composable
-fun LookaboutApp(viewModel: LookaboutViewModel = viewModel()) {
+fun LookaboutApp(noticeTaps: Int = 0, viewModel: LookaboutViewModel = viewModel()) {
     val screen = viewModel.screen
     // On Setup Back is not handled, so it leaves the app; during a walk it is consumed and ignored.
     BackHandler(enabled = screen.backTarget != null) { viewModel.back() }
@@ -25,6 +30,12 @@ fun LookaboutApp(viewModel: LookaboutViewModel = viewModel()) {
         onLaunch = viewModel::photoRequested,
     )
     val takePhoto: () -> Unit = { if (viewModel.canTakePhoto) openCamera() }
+    // A tap on the walk notice shows the walk, and opens the camera when the picture waits for its photo.
+    LaunchedEffect(noticeTaps) {
+        if (noticeTaps > 0 && viewModel.waitsForPhoto) takePhoto()
+    }
+    // Start walk asks once for notifications (Android 13+); the notice appears as soon as they are allowed.
+    val askNotifications = rememberNotificationPermissionAsk(onAnswered = viewModel::refreshWalkNotice)
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         val modifier = Modifier
@@ -41,7 +52,10 @@ fun LookaboutApp(viewModel: LookaboutViewModel = viewModel()) {
             )
             screen == Screen.List && list != null -> ListScreen(
                 list = list,
-                onStartWalk = viewModel::startWalk,
+                onStartWalk = {
+                    viewModel.startWalk()
+                    askNotifications()
+                },
                 onNewList = viewModel::newList,
                 modifier = modifier,
             )
