@@ -167,4 +167,21 @@ class WalkArchiveTest {
         val summaries = listOf(10L, 30L, 20L).map { archivedWalkSummary(it, walk.copy(startedAtMillis = it)) }
         assertEquals(listOf(30L, 20L, 10L), newestFirst(summaries).map { it.startedAtMillis })
     }
+
+    @Test
+    fun photoPathsListEveryArchivedPhoto() {
+        val archive = WalkArchive(dir())
+        assertEquals(emptySet<String>(), archive.photoPaths())
+
+        archive.save(finishedWalk())
+        assertEquals(setOf("/pictures/photo-1.jpg", "/pictures/photo-3.jpg"), archive.photoPaths())
+    }
+
+    @Test
+    fun photoPathsAreUnknownWhenAnArchivedWalkCannotBeRead() {
+        val archive = WalkArchive(dir())
+        archive.save(finishedWalk())
+        File(dir(), "walk-5.json").writeText("not a walk")
+        assertNull(archive.photoPaths())
+    }
 }

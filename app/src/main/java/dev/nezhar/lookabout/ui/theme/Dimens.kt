@@ -26,9 +26,6 @@ val PhotoRadius = 16.dp
 /** Corner radius of chips, a corrected criterion row, the error card and Summary thumbnails. */
 val ChipRadius = 12.dp
 
-/** Tallest the photo on Accepted and Not yet gets (320 x 144 at 360 dp). */
-val VerdictPhotoMaxHeight = 144.dp
-
 /** The photo on Accepted and Not yet gives up height for the criteria down to this (departure 2). */
 val VerdictPhotoMinHeight = 80.dp
 

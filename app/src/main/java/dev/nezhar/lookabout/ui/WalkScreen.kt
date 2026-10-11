@@ -2,6 +2,7 @@ package dev.nezhar.lookabout.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -36,6 +37,7 @@ import dev.nezhar.lookabout.endCheckProgress
 import dev.nezhar.lookabout.endCheckTitle
 import dev.nezhar.lookabout.modelWaitNote
 import dev.nezhar.lookabout.positionText
+import dev.nezhar.lookabout.verdictPhotoMaxHeight
 import dev.nezhar.lookabout.ui.theme.ActionGap
 import dev.nezhar.lookabout.ui.theme.ButtonIconSize
 import dev.nezhar.lookabout.ui.theme.CheckingProgressWidth
@@ -45,7 +47,6 @@ import dev.nezhar.lookabout.ui.theme.PageInset
 import dev.nezhar.lookabout.ui.theme.PrimaryTint
 import dev.nezhar.lookabout.ui.theme.SecondaryActionHeight
 import dev.nezhar.lookabout.ui.theme.TopBarHeight
-import dev.nezhar.lookabout.ui.theme.VerdictPhotoMaxHeight
 import dev.nezhar.lookabout.ui.theme.VerdictPhotoMinHeight
 import dev.nezhar.lookabout.ui.theme.button
 import dev.nezhar.lookabout.ui.theme.caption
@@ -93,11 +94,15 @@ private val ButtonsGap = 8.dp
  *   indicator + 28 + 20 "You can keep looking around." = 468.
  * - Accepted and Not yet: 8 + 48 bar + 16 + 48 verdict + 24 coverage + 12 + photo + 12 + rows +
  *   4 + 20 hint, then at least 8 + 56 Retake + 8 + 48 Skip + 16 bottom: 328 plus the photo and
- *   rows, leaving 400 for them. Four two-line test criteria take 4 x 64 = 256 (40 text + 16
+ *   rows, leaving 400 for them. The photo's cap is 144 here (704 dp of content, see
+ *   [verdictPhotoMaxHeight]). Four two-line test criteria take 4 x 64 = 256 (40 text + 16
  *   padding fits 64), so the photo keeps its 144. Four corrected two-line criteria take 4 x 80 =
  *   320 (40 + 18 "Changed by you" + 16 fits 80), and the photo gives up height down to its 80.
- *   Accepted has no Skip, so 56 more to spare. With a 24 dp gesture bar this is the deck's
- *   geometry: photo at y 180, criteria at y 336, Retake at y 648, Skip at y 712.
+ *   Accepted has no Skip, so 56 more to spare. With a 24 dp gesture bar (728 dp of content, cap
+ *   still 144) this is the deck's geometry: photo at y 180, criteria at y 336, Retake at y 648,
+ *   Skip at y 712. At 412 x 915 with 24 dp bars the content is 843 dp, the cap 201 and the space
+ *   for the photo and rows 867 - 328 = 539, so the photo shows at about 200 as in the deck, even
+ *   with four corrected rows (320).
  * - Check paused: 8 + 48 bar + 24 + 240 photo + 28 + 40 "Check paused" + 36 + 56 error card +
  *   8 + 56 Try again + 8 + 48 Skip + 16 bottom = 616.
  * - Photo taken: as Check paused with 28 + 20 for its line of text in place of 36 + 56 for the
@@ -174,13 +179,15 @@ fun WalkScreen(
  * under it when the model is not on the phone or failed to load, and Show results now as a text
  * action at the bottom. No other actions; the screen stays on. With the test texts at 360 x 800
  * dp: 8 + 48 bar + 24 + 240 photo + 28 + 40 + 28 + 4 + 28 + 40 (the test picture text in two
- * lines) = 488; waiting for a missing model adds 28 + 72 for the note (three lines) and 8 + 48
- * for Show results now: 644.
+ * lines) = 488; waiting for a missing model adds 28 + 48 for the note (two lines) and 8 + 48
+ * for Show results now: 620; for a model that failed to load the note takes three lines (72): 644.
  *
  * @param shotIndex the shot whose photo is being checked, or checked first once the model is ready.
  * @param waitingForModel true while the check waits for the model.
  * @param modelUnavailable true when the model is not on the phone or failed to load; a waiting
  *   check says so under the heading.
+ * @param modelMissing true when the model is not on the phone: the note then points to Show
+ *   results now, as the model cannot get ready during the walk.
  * @param canShowResultsNow true when Show results now shows: the check waits for a model that is
  *   not on the phone or failed to load.
  * @param onShowResultsNow stops the check and opens Summary.
@@ -192,6 +199,7 @@ fun EndCheckScreen(
     modifier: Modifier = Modifier,
     waitingForModel: Boolean = false,
     modelUnavailable: Boolean = false,
+    modelMissing: Boolean = false,
     canShowResultsNow: Boolean = false,
     onShowResultsNow: () -> Unit = {},
 ) {
@@ -227,7 +235,7 @@ fun EndCheckScreen(
             }
             Spacer(Modifier.height(StatusGap))
             StatusTitle(endCheckTitle(walk, shotIndex, waitingForModel))
-            val note = if (waitingForModel) modelWaitNote(modelUnavailable) else null
+            val note = if (waitingForModel) modelWaitNote(modelUnavailable, modelMissing) else null
             if (note != null) {
                 Spacer(Modifier.height(StatusGap))
                 SecondaryLine(note)
@@ -329,9 +337,9 @@ private fun CheckingScreen(walk: Walk, shot: Shot, modifier: Modifier = Modifier
  * crosses and the hint, then [actions] at the bottom. Tapping a criterion calls [onFlip] with its
  * index; the verdict, coverage and actions follow the shot's answers after corrections.
  *
- * The photo is full width, at most [VerdictPhotoMaxHeight] high, and gives up height, down to
- * [VerdictPhotoMinHeight], when the criteria rows grow, so the actions stay in place (see
- * [WalkScreen] for the numbers).
+ * The photo is full width, at most [verdictPhotoMaxHeight] high for the screen's height (144 dp
+ * at 360 x 800, about 200 at 412 x 915), and gives up height, down to [VerdictPhotoMinHeight],
+ * when the criteria rows grow, so the actions stay in place (see [WalkScreen] for the numbers).
  */
 @Composable
 private fun VerdictScreen(
@@ -343,43 +351,46 @@ private fun VerdictScreen(
     actions: @Composable () -> Unit,
 ) {
     val answers = shot.finalAnswers
-    Column(modifier = modifier) {
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-        ) {
-            TopBar(walk)
-            Spacer(Modifier.height(16.dp))
-            VerdictHeader(accepted, coverageText(answers))
-            Spacer(Modifier.height(12.dp))
-            WalkPhoto(
-                shot.photoPath,
+    BoxWithConstraints(modifier = modifier) {
+        val photoMax = verdictPhotoMaxHeight(maxHeight.value).dp
+        Column(modifier = Modifier.fillMaxSize()) {
+            Column(
                 modifier = Modifier
-                    .weight(1f, fill = false)
-                    .heightIn(min = VerdictPhotoMinHeight, max = VerdictPhotoMaxHeight)
-                    .fillMaxWidth()
-                    .fillMaxHeight(),
-            )
-            Spacer(Modifier.height(12.dp))
-            shot.questions.forEachIndexed { index, question ->
-                CriterionRow(
-                    question,
-                    yes = answers.getOrElse(index) { false },
-                    corrected = shot.corrected.getOrElse(index) { false },
-                    last = index == shot.questions.lastIndex,
-                    onTap = { onFlip(index) },
+                    .weight(1f)
+                    .fillMaxWidth(),
+            ) {
+                TopBar(walk)
+                Spacer(Modifier.height(16.dp))
+                VerdictHeader(accepted, coverageText(answers))
+                Spacer(Modifier.height(12.dp))
+                WalkPhoto(
+                    shot.photoPath,
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .heightIn(min = VerdictPhotoMinHeight, max = photoMax)
+                        .fillMaxWidth()
+                        .fillMaxHeight(),
+                )
+                Spacer(Modifier.height(12.dp))
+                shot.questions.forEachIndexed { index, question ->
+                    CriterionRow(
+                        question,
+                        yes = answers.getOrElse(index) { false },
+                        corrected = shot.corrected.getOrElse(index) { false },
+                        last = index == shot.questions.lastIndex,
+                        onTap = { onFlip(index) },
+                    )
+                }
+                Text(
+                    "Tap a check to change it.",
+                    style = MaterialTheme.typography.caption,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
                 )
             }
-            Text(
-                "Tap a check to change it.",
-                style = MaterialTheme.typography.caption,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
-            )
+            Spacer(Modifier.height(ButtonsGap))
+            actions()
         }
-        Spacer(Modifier.height(ButtonsGap))
-        actions()
     }
 }
 
@@ -590,6 +601,7 @@ private fun EndCheckWaitingPreview() {
             modifier = PreviewBars,
             waitingForModel = true,
             modelUnavailable = true,
+            modelMissing = true,
             canShowResultsNow = true,
         )
     }

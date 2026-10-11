@@ -185,7 +185,8 @@ fun VerdictHeader(accepted: Boolean, coverage: String, modifier: Modifier = Modi
  * One criterion with a green tick (YES) or a grey cross (NO), showing the answer after the
  * walker's correction, and a line under it: a thin one, or a stronger one under the [last] row.
  * The whole row is the tap target: tapping it calls [onTap] to change the answer. A [corrected]
- * row is filled, has rounded corners and reads "Changed by you" under the question. At least
+ * row is filled, has rounded corners, reads "Changed by you" under the question and has no line
+ * under it, as on the deck's correction screen. At least
  * 64 dp high, 80 dp when corrected; the icon is centred 20 dp from the row's start and the
  * question starts 44 dp in.
  */
@@ -205,6 +206,7 @@ fun CriterionRow(
             .heightIn(min = if (corrected) CriterionRowHeight + CorrectionExtra else CriterionRowHeight)
             .drawWithContent {
                 drawContent()
+                if (corrected) return@drawWithContent
                 val stroke = 1.dp.toPx()
                 val y = size.height - stroke / 2
                 drawLine(line, Offset(0f, y), Offset(size.width, y), strokeWidth = stroke)

@@ -48,15 +48,41 @@ fun pastWalkRows(
 /** Setup offers Past walks once the archive is known to hold at least one walk. */
 fun offersPastWalks(pastWalks: List<ArchivedWalkSummary>?): Boolean = !pastWalks.isNullOrEmpty()
 
+/** True when [path] lies directly in [photoDir], the app's Pictures folder: one of the app's own photos. */
+fun isAppPhoto(path: String, photoDir: String): Boolean =
+    File(path).absoluteFile.normalize().parentFile == File(photoDir).absoluteFile.normalize()
+
 /**
  * The photo files of [walk] that are the app's own copies: every shot's photo that lies directly
  * in [photoDir], the app's Pictures folder, each once. Anything elsewhere (such as a gallery copy)
  * is never listed, so deleting a walk cannot touch it.
  */
-fun appPhotoPaths(walk: Walk, photoDir: String): List<String> {
-    val dir = File(photoDir).absoluteFile.normalize()
-    return walk.shots
+fun appPhotoPaths(walk: Walk, photoDir: String): List<String> =
+    walk.shots
         .mapNotNull { it.photoPath }
-        .filter { File(it).absoluteFile.normalize().parentFile == dir }
+        .filter { isAppPhoto(it, photoDir) }
         .distinct()
+
+/** Every photo [walk] references: its shots' photos and the one the camera is about to write. */
+fun walkPhotoPaths(walk: Walk): Set<String> =
+    walk.shots.mapNotNull { it.photoPath }.toSet() + listOfNotNull(walk.pendingPhotoPath)
+
+/**
+ * The photos that [before] referenced and [after], the same walk one step later, no longer does:
+ * the photo Retake replaced, or the unchecked photo dropped when its shot was skipped. A photo
+ * still on any shot of [after], or about to be written by the camera ([Walk.pendingPhotoPath]),
+ * is never listed. Each path once.
+ */
+fun droppedPhotos(before: Walk, after: Walk): List<String> {
+    val kept = walkPhotoPaths(after)
+    return before.shots.mapNotNull { it.photoPath }.distinct().filter { it !in kept }
 }
+
+/**
+ * Of the [dropped] photos, those that may be deleted once the walk file has been written: none
+ * when that write failed ([written] false) or the walk file cannot be read ([savedWalkPhotos]
+ * null), else those the saved walk does not reference ([savedWalkPhotos], empty when no walk is
+ * saved).
+ */
+fun photosSafeToDelete(dropped: List<String>, written: Boolean, savedWalkPhotos: Set<String>?): List<String> =
+    if (!written || savedWalkPhotos == null) emptyList() else dropped.filter { it !in savedWalkPhotos }

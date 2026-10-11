@@ -31,6 +31,10 @@ import dev.nezhar.lookabout.checkPhoto
 import dev.nezhar.lookabout.checksAtEnd
 import dev.nezhar.lookabout.copyToGallery
 import dev.nezhar.lookabout.downloadStep
+import dev.nezhar.lookabout.droppedPhotos
+import dev.nezhar.lookabout.isAppPhoto
+import dev.nezhar.lookabout.photosSafeToDelete
+import dev.nezhar.lookabout.walkPhotoPaths
 import dev.nezhar.lookabout.listPrompt
 import dev.nezhar.lookabout.missingModelText
 import dev.nezhar.lookabout.modelFile
@@ -56,6 +60,8 @@ import dev.nezhar.lookabout.walk.archiveId
 import dev.nezhar.lookabout.walk.isAccepted
 import dev.nezhar.lookabout.writeList
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -64,6 +70,8 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.LocalDateTime
@@ -125,6 +133,10 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
 
     /** Every walk that reached Summary, with its results. */
     val archivedWalks = ArchivedWalks.at(File(application.filesDir, WALK_ARCHIVE_DIR))
+
+    // Held while a photo is copied to the gallery or dropped photos are deleted, so a photo
+    // skipped right after it was taken is not deleted before its gallery copy is written.
+    private val photoFiles = Mutex()
 
     private val downloader = ModelDownloader(application)
 
@@ -379,12 +391,17 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
         screen = Screen.Walk
     }
 
-    /** Replaces the walk in progress with an updated one. Returns true when [change] changed it. */
+    /**
+     * Replaces the walk in progress with an updated one. Returns true when [change] changed it. A
+     * photo the update dropped (replaced by Retake, or skipped before its check) is deleted, see
+     * [deleteDroppedPhotos].
+     */
     fun updateWalk(change: (Walk) -> Walk): Boolean {
         val current = walk ?: return false
         val updated = change(current)
         walk = updated
-        saveWalk()
+        val written = saveWalk()
+        deleteDroppedPhotos(current, updated, written)
         return updated != current
     }
 
@@ -423,12 +440,14 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
 
     /**
      * Writes the walk, or deletes the saved one when there is no walk, in the background. A walk on
-     * Summary is also written to the archive, so it always holds the latest results.
+     * Summary is also written to the archive, so it always holds the latest results. The result
+     * completes with true once the walk file holds this save or a newer one (see [WalkStore.save]).
      */
-    private fun saveWalk() {
+    private fun saveWalk(): Deferred<Boolean> {
         val current = walk
-        walkStore.save(current?.let { SavedWalk(it, onSummary) })
+        val written = walkStore.save(current?.let { SavedWalk(it, onSummary) })
         if (current != null && onSummary) archivedWalks.save(current)
+        return written
     }
 
     /**
@@ -526,8 +545,8 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /**
-     * The camera wrote [file]: it becomes the current shot's photo, replacing an older one, and is
-     * checked, unless the walk checks its photos at the end.
+     * The camera wrote [file]: it becomes the current shot's photo, replacing an older one (whose
+     * file is deleted), and is checked, unless the walk checks its photos at the end.
      */
     fun photoTaken(file: File) {
         if (!canTakePhoto) return
@@ -538,8 +557,47 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
             val pending = if (w.pendingPhotoPath == file.path) w else w.photoRequested(file.path)
             pending.photoTaken()
         }
-        viewModelScope.launch(Dispatchers.IO) { copyToGallery(getApplication<Application>(), file) }
+        // Undispatched, so the copy holds the photo lock before any later delete asks for it.
+        viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            photoFiles.withLock {
+                withContext(Dispatchers.IO) { copyToGallery(getApplication<Application>(), file) }
+            }
+        }
         if (!current.checkAtEnd) checkCurrentPhoto()
+    }
+
+    /**
+     * Deletes, in the background, the photos [before] referenced and [after] no longer does
+     * ([droppedPhotos]): only the app's own files in its Pictures folder, never a gallery copy.
+     * It first waits for the walk file write of this update ([written]) and keeps every photo when
+     * that write failed or the walk file cannot be read; then it deletes only photos that neither
+     * the walk in progress, the saved walk file nor any archived walk references.
+     */
+    private fun deleteDroppedPhotos(before: Walk, after: Walk, written: Deferred<Boolean>) {
+        val candidates = droppedPhotos(before, after)
+        if (candidates.isEmpty()) return
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            try {
+                val saved = written.await()
+                val inUse = walk?.let(::walkPhotoPaths).orEmpty()
+                val stillDropped = candidates.filter { it !in inUse }
+                if (!saved || stillDropped.isEmpty()) return@launch
+                photoFiles.withLock {
+                    withContext<Unit>(Dispatchers.IO) {
+                        val photoDir = app.getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+                            ?: return@withContext
+                        val own = stillDropped.filter { isAppPhoto(it, photoDir.path) }
+                        val deletable = photosSafeToDelete(own, saved, walkStore.photoPaths())
+                        if (deletable.isNotEmpty()) archivedWalks.deleteUnarchivedPhotos(deletable)
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (t: Throwable) {
+                Log.w(Gemma.TAG, "Could not delete a dropped photo", t)
+            }
+        }
     }
 
     /** Try again on Check paused: checks the same photo again. */
@@ -548,7 +606,10 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
         checkCurrentPhoto()
     }
 
-    /** Skip: moves on without an accepted photo; on the last picture it opens Summary. */
+    /**
+     * Skip: moves on without an accepted photo; on the last picture it opens Summary. A photo that
+     * was not checked is dropped from the shot and its file deleted.
+     */
     fun skip() {
         val current = walk ?: return
         if (checking || current.current == null) return
@@ -619,6 +680,13 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
             ModelState.Missing, is ModelState.Failed, is ModelState.DownloadFailed -> true
             ModelState.Loading, ModelState.Ready, is ModelState.Downloading -> false
         }
+
+    /**
+     * True when the model is not on the phone (never downloaded, or its download failed): it cannot
+     * get ready during a walk, so the waiting end check points to Show results now.
+     */
+    val modelMissing: Boolean
+        get() = model == ModelState.Missing || model is ModelState.DownloadFailed
 
     private var endCheckJob: Job? = null
 
