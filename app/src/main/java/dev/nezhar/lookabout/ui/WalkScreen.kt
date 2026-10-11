@@ -3,48 +3,73 @@ package dev.nezhar.lookabout.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import dev.nezhar.lookabout.R
 import dev.nezhar.lookabout.WalkStep
 import dev.nezhar.lookabout.coverageText
 import dev.nezhar.lookabout.endCheckProgress
 import dev.nezhar.lookabout.endCheckTitle
 import dev.nezhar.lookabout.modelWaitNote
 import dev.nezhar.lookabout.positionText
+import dev.nezhar.lookabout.ui.theme.ActionGap
+import dev.nezhar.lookabout.ui.theme.ButtonIconSize
+import dev.nezhar.lookabout.ui.theme.CheckingProgressWidth
 import dev.nezhar.lookabout.ui.theme.LookaboutTheme
+import dev.nezhar.lookabout.ui.theme.MainButtonHeight
+import dev.nezhar.lookabout.ui.theme.PageInset
+import dev.nezhar.lookabout.ui.theme.PrimaryTint
+import dev.nezhar.lookabout.ui.theme.SecondaryActionHeight
+import dev.nezhar.lookabout.ui.theme.TopBarHeight
+import dev.nezhar.lookabout.ui.theme.VerdictPhotoMaxHeight
+import dev.nezhar.lookabout.ui.theme.VerdictPhotoMinHeight
+import dev.nezhar.lookabout.ui.theme.button
+import dev.nezhar.lookabout.ui.theme.caption
+import dev.nezhar.lookabout.ui.theme.verdict
 import dev.nezhar.lookabout.walk.Picture
 import dev.nezhar.lookabout.walk.Shot
 import dev.nezhar.lookabout.walk.Walk
 import dev.nezhar.lookabout.walk.builtInPictures
 import dev.nezhar.lookabout.walkStep
 
-/** Height of the buttons at the bottom: above the 48 dp minimum, for a thumb outdoors. */
-private val BottomButtonHeight = 56.dp
+/** Above the top bar, under the status bar. */
+private val TopPadding = 8.dp
 
-/** The tallest the photo on Accepted and Not yet gets. */
-private val PhotoMaxHeight = 144.dp
+/** Under the buttons, above the navigation bar. */
+private val BottomPadding = 16.dp
 
-/** The photo on Accepted and Not yet gives up height for the criteria down to this. */
-private val PhotoMinHeight = 80.dp
+/** Between the top bar and the photo on Checking, Check paused and Photo taken. */
+private val PhotoGap = 24.dp
+
+/** Between the photo, the title, the progress indicator and the line under it on Checking. */
+private val StatusGap = 28.dp
+
+/** The smallest gap above the buttons on Next picture, Accepted and Not yet. */
+private val ButtonsGap = 8.dp
 
 /**
  * Walk: one picture at a time, in four screens: Next picture, Checking, Accepted and Not yet,
@@ -52,6 +77,31 @@ private val PhotoMinHeight = 80.dp
  * taken shows instead of Checking after Shoot. Which one shows follows from the current shot,
  * [checking], [checkPaused] and the walk's setting (see [walkStep]). The screen stays on while
  * Checking shows.
+ *
+ * Layout from design/values.md: a 20 dp page inset, the counter and progress dots in a 48 dp top
+ * bar 8 dp under the status bar, and at the bottom, 16 dp above the navigation bar, the 56 dp main
+ * button with the 48 dp text action 8 dp under it. Every screen fits 360 x 800 dp without
+ * scrolling. With a 24 dp status bar and a 48 dp three-button navigation bar that leaves 728 dp,
+ * and with the test texts (the previews) it works out as:
+ *
+ * - Next picture: 8 top + 48 bar + 28 + 20 topic + 24 = 128 above the picture text; 16 + 56 Shoot
+ *   + 8 + 48 Skip + 16 bottom = 144 below it, leaving 456. The longest picture text a walk
+ *   allows, "Something small and overlooked, shot so close it fills the whole frame", takes 7
+ *   lines of 57 / 64 sp at 320 dp wide (as on the deck's long prompt screen): 448, so it keeps
+ *   the largest size. A text that needs 8 lines (512) drops to 45 / 52, then to 36 / 44.
+ * - Checking: 8 + 48 bar + 24 + 240 photo (320 x 240, 4:3) + 28 + 40 "Checking" + 28 + 4
+ *   indicator + 28 + 20 "You can keep looking around." = 468.
+ * - Accepted and Not yet: 8 + 48 bar + 16 + 48 verdict + 24 coverage + 12 + photo + 12 + rows +
+ *   4 + 20 hint, then at least 8 + 56 Retake + 8 + 48 Skip + 16 bottom: 328 plus the photo and
+ *   rows, leaving 400 for them. Four two-line test criteria take 4 x 64 = 256 (40 text + 16
+ *   padding fits 64), so the photo keeps its 144. Four corrected two-line criteria take 4 x 80 =
+ *   320 (40 + 18 "Changed by you" + 16 fits 80), and the photo gives up height down to its 80.
+ *   Accepted has no Skip, so 56 more to spare. With a 24 dp gesture bar this is the deck's
+ *   geometry: photo at y 180, criteria at y 336, Retake at y 648, Skip at y 712.
+ * - Check paused: 8 + 48 bar + 24 + 240 photo + 28 + 40 "Check paused" + 36 + 56 error card +
+ *   8 + 56 Try again + 8 + 48 Skip + 16 bottom = 616.
+ * - Photo taken: as Check paused with 28 + 20 for its line of text in place of 36 + 56 for the
+ *   card, Retake in place of Skip: 572.
  *
  * @param checking true while the current photo is being checked; no actions are offered then.
  * @param checkPaused true when the check of the current photo failed.
@@ -81,50 +131,51 @@ fun WalkScreen(
     val shot = walk.current
     val screenModifier = modifier
         .fillMaxSize()
-        .padding(horizontal = 24.dp, vertical = 16.dp)
+        .padding(start = PageInset, end = PageInset, top = TopPadding, bottom = BottomPadding)
     if (shot == null) {
         // Next picture and Skip on the last picture open Summary, so this does not normally show.
         Box(modifier = screenModifier, contentAlignment = Alignment.BottomCenter) {
-            MainButton("Finish walk", onFinish, Modifier.fillMaxWidth())
+            Actions("Finish walk", R.drawable.ic_arrow_forward, onFinish)
         }
         return
     }
+    val nextLabel = if (walk.isLast) "Finish walk" else "Next picture"
     when (walkStep(shot, checking, checkPaused, walk.checkAtEnd)) {
         WalkStep.NextPicture -> NextPictureScreen(walk, shot, onShoot, onSkip, screenModifier)
         WalkStep.Checking -> {
             KeepScreenOn()
             CheckingScreen(walk, shot, screenModifier)
         }
-        WalkStep.Accepted -> VerdictScreen(shot, accepted = true, onFlip = onFlip, modifier = screenModifier) {
-            MainButton(
-                if (walk.isLast) "Finish walk" else "Next picture",
-                onNextPicture,
-                Modifier.weight(1f),
-            )
+        WalkStep.Accepted -> VerdictScreen(walk, shot, accepted = true, onFlip = onFlip, modifier = screenModifier) {
+            Actions(nextLabel, R.drawable.ic_arrow_forward, onNextPicture)
         }
-        WalkStep.NotYet -> VerdictScreen(shot, accepted = false, onFlip = onFlip, modifier = screenModifier) {
-            SecondaryButton("Skip", onSkip, Modifier.weight(1f))
-            MainButton("Retake", onRetake, Modifier.weight(1f))
+        WalkStep.NotYet -> VerdictScreen(walk, shot, accepted = false, onFlip = onFlip, modifier = screenModifier) {
+            Actions("Retake", R.drawable.ic_camera, onRetake, "Skip", onSkip)
         }
-        WalkStep.CheckPaused -> CheckPausedScreen(shot, modifier = screenModifier) {
-            SecondaryButton("Skip", onSkip, Modifier.weight(1f))
-            MainButton("Try again", onTryAgain, Modifier.weight(1f))
+        WalkStep.CheckPaused -> PhotoStatusScreen(walk, shot, "Check paused", modifier = screenModifier, actions = {
+            Actions("Try again", null, onTryAgain, "Skip", onSkip)
+        }) {
+            Spacer(Modifier.height(36.dp))
+            ErrorCard("Couldn't check this photo.")
         }
-        WalkStep.PhotoTaken -> PhotoTakenScreen(walk, shot, modifier = screenModifier) {
-            SecondaryButton("Retake", onRetake, Modifier.weight(1f))
-            MainButton(
-                if (walk.isLast) "Finish walk" else "Next picture",
-                onNextPicture,
-                Modifier.weight(1f),
-            )
+        WalkStep.PhotoTaken -> PhotoStatusScreen(walk, shot, "Photo taken", modifier = screenModifier, actions = {
+            Actions(nextLabel, R.drawable.ic_arrow_forward, onNextPicture, "Retake", onRetake)
+        }) {
+            Spacer(Modifier.height(StatusGap))
+            SecondaryLine("Checked at the end of the walk.")
         }
     }
 }
 
 /**
- * The check at the end of the walk: "Checking 2 of 5" with a spinner, how far the check is, and
- * the picture and photo being checked. Until the model is ready it says "Getting the model ready"
- * instead. No actions; the screen stays on.
+ * The check at the end of the walk, laid out like Checking: how far the check is in the top bar,
+ * the photo being checked, "Checking 2 of 5" with an indeterminate indicator, and the picture
+ * text. Until the model is ready the title says "Getting the model ready" instead, with a line
+ * under it when the model is not on the phone or failed to load, and Show results now as a text
+ * action at the bottom. No other actions; the screen stays on. With the test texts at 360 x 800
+ * dp: 8 + 48 bar + 24 + 240 photo + 28 + 40 + 28 + 4 + 28 + 40 (the test picture text in two
+ * lines) = 488; waiting for a missing model adds 28 + 72 for the note (three lines) and 8 + 48
+ * for Show results now: 644.
  *
  * @param shotIndex the shot whose photo is being checked, or checked first once the model is ready.
  * @param waitingForModel true while the check waits for the model.
@@ -149,109 +200,79 @@ fun EndCheckScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(start = PageInset, end = PageInset, top = TopPadding, bottom = BottomPadding),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            CircularProgressIndicator(modifier = Modifier.size(32.dp))
-            Text(endCheckTitle(walk, shotIndex, waitingForModel), style = MaterialTheme.typography.headlineMedium)
-        }
-        val note = if (waitingForModel) modelWaitNote(modelUnavailable) else null
-        if (note != null) {
-            Text(
-                note,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        if (canShowResultsNow) {
-            TextButton(onClick = onShowResultsNow) {
-                Text("Show results now", style = MaterialTheme.typography.titleMedium)
-            }
-        }
-        LinearProgressIndicator(
-            progress = { endCheckProgress(walk, shotIndex) },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        if (shot != null) {
-            Text(shot.text, style = MaterialTheme.typography.titleLarge)
-            WalkPhoto(
-                shot.photoPath,
-                modifier = Modifier
-                    .weight(1f, fill = false)
-                    .align(Alignment.CenterHorizontally)
-                    .aspectRatio(3f / 4f),
-            )
-        }
-    }
-}
-
-/**
- * Photo taken, when the photos are checked at the end: the position, the title, one line of text
- * and the photo, laid out like Check paused, then [buttons] at the bottom. No result is shown.
- */
-@Composable
-private fun PhotoTakenScreen(
-    walk: Walk,
-    shot: Shot,
-    modifier: Modifier = Modifier,
-    buttons: @Composable RowScope.() -> Unit,
-) {
-    Column(modifier = modifier) {
         Column(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            PositionRow(walk)
-            Column {
-                Text(
-                    "Photo taken",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text("Checked at the end of the walk.", style = MaterialTheme.typography.titleLarge)
-            }
-            WalkPhoto(
-                shot.photoPath,
+            Box(
                 modifier = Modifier
-                    .weight(1f, fill = false)
-                    .align(Alignment.CenterHorizontally)
-                    .heightIn(min = 80.dp)
-                    .aspectRatio(4f / 3f),
-            )
+                    .fillMaxWidth()
+                    .height(TopBarHeight),
+                contentAlignment = Alignment.Center,
+            ) {
+                LinearProgressIndicator(
+                    progress = { endCheckProgress(walk, shotIndex) },
+                    modifier = Modifier.fillMaxWidth(),
+                    trackColor = PrimaryTint,
+                )
+            }
+            if (shot != null) {
+                Spacer(Modifier.height(PhotoGap))
+                StatusPhoto(shot.photoPath)
+            }
+            Spacer(Modifier.height(StatusGap))
+            StatusTitle(endCheckTitle(walk, shotIndex, waitingForModel))
+            val note = if (waitingForModel) modelWaitNote(modelUnavailable) else null
+            if (note != null) {
+                Spacer(Modifier.height(StatusGap))
+                SecondaryLine(note)
+            }
+            Spacer(Modifier.height(StatusGap))
+            CheckingIndicator()
+            if (shot != null) {
+                Spacer(Modifier.height(StatusGap))
+                SecondaryLine(shot.text)
+            }
         }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            content = buttons,
-        )
+        if (canShowResultsNow) {
+            Spacer(Modifier.height(ButtonsGap))
+            TextButton(
+                onClick = onShowResultsNow,
+                modifier = Modifier.heightIn(min = SecondaryActionHeight),
+            ) {
+                Text("Show results now", style = MaterialTheme.typography.button)
+            }
+        }
     }
 }
 
-/** "2 of 5" and the progress dots. */
+/** The top bar of the loop screens: "2 of 5" at the start, the progress dots at the end. */
 @Composable
-private fun PositionRow(walk: Walk, modifier: Modifier = Modifier) {
+private fun TopBar(walk: Walk, modifier: Modifier = Modifier) {
     Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .height(TopBarHeight),
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             positionText(walk.currentIndex, walk.shots.size),
-            style = MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.bodyLarge,
         )
         ProgressDots(count = walk.shots.size, current = walk.currentIndex)
     }
 }
 
-/** Next picture: the position, the picture text as large as fits, then Skip and Shoot. */
+/**
+ * Next picture: the top bar, the walk's topic, the picture text in the largest of the three
+ * prompt sizes that fits, then Shoot and Skip.
+ */
 @Composable
 private fun NextPictureScreen(
     walk: Walk,
@@ -261,68 +282,65 @@ private fun NextPictureScreen(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
-        PositionRow(walk)
+        TopBar(walk)
+        Text(
+            walk.topic,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 28.dp),
+        )
         PictureText(
             shot.text,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .padding(vertical = 24.dp),
+                .padding(top = 24.dp, bottom = 16.dp),
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            SecondaryButton("Skip", onSkip, Modifier.weight(1f))
-            MainButton("Shoot", onShoot, Modifier.weight(1f))
-        }
-    }
-}
-
-/** Checking: the photo just taken and "Checking" with a progress indicator. No actions. */
-@Composable
-private fun CheckingScreen(walk: Walk, shot: Shot, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        PositionRow(walk)
-        WalkPhoto(
-            shot.photoPath,
-            modifier = Modifier
-                .weight(1f, fill = false)
-                .align(Alignment.CenterHorizontally)
-                .aspectRatio(3f / 4f),
-        )
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            CircularProgressIndicator(modifier = Modifier.size(32.dp))
-            Text("Checking", style = MaterialTheme.typography.headlineMedium)
-        }
+        Actions("Shoot", R.drawable.ic_camera, onShoot, "Skip", onSkip)
     }
 }
 
 /**
- * Accepted or Not yet: the verdict, the coverage, the photo, the four criteria with ticks or
- * crosses and the hint, then [buttons] at the bottom. Tapping a criterion calls [onFlip] with its
- * index; the verdict, coverage and buttons follow the shot's answers after corrections.
+ * Checking: the photo just taken, "Checking", an indeterminate indicator and "You can keep
+ * looking around.", all centred. No actions.
+ */
+@Composable
+private fun CheckingScreen(walk: Walk, shot: Shot, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        TopBar(walk)
+        Spacer(Modifier.height(PhotoGap))
+        StatusPhoto(shot.photoPath)
+        Spacer(Modifier.height(StatusGap))
+        StatusTitle("Checking")
+        Spacer(Modifier.height(StatusGap))
+        CheckingIndicator()
+        Spacer(Modifier.height(StatusGap))
+        SecondaryLine("You can keep looking around.")
+    }
+}
+
+/**
+ * Accepted or Not yet: the verdict and coverage, the photo, the four criteria with ticks or
+ * crosses and the hint, then [actions] at the bottom. Tapping a criterion calls [onFlip] with its
+ * index; the verdict, coverage and actions follow the shot's answers after corrections.
  *
- * The photo is at most [PhotoMaxHeight] high and gives up height, down to [PhotoMinHeight], when
- * the criteria need it. At 360 x 800 dp with a 24 dp status bar and a 48 dp navigation bar, Not yet
- * with four corrected three-line criteria works out as: 800 - 72 bars - 32 screen padding = 696;
- * buttons 16 + 56 = 72, leaving 624 for the column above them; verdict and coverage 36 + 28 = 64,
- * two gaps of 12, criteria 4 x (72 text + 8 padding + 16 "Changed by you") = 384, hint 8 + 20 = 28,
- * so 500, which leaves 124 dp for the photo (two-line criteria leave 220, capped at 144).
+ * The photo is full width, at most [VerdictPhotoMaxHeight] high, and gives up height, down to
+ * [VerdictPhotoMinHeight], when the criteria rows grow, so the actions stay in place (see
+ * [WalkScreen] for the numbers).
  */
 @Composable
 private fun VerdictScreen(
+    walk: Walk,
     shot: Shot,
     accepted: Boolean,
     onFlip: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    buttons: @Composable RowScope.() -> Unit,
+    actions: @Composable () -> Unit,
 ) {
     val answers = shot.finalAnswers
     Column(modifier = modifier) {
@@ -330,102 +348,151 @@ private fun VerdictScreen(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column {
-                VerdictHeader(accepted)
-                Text(coverageText(answers), style = MaterialTheme.typography.titleLarge)
-            }
+            TopBar(walk)
+            Spacer(Modifier.height(16.dp))
+            VerdictHeader(accepted, coverageText(answers))
+            Spacer(Modifier.height(12.dp))
             WalkPhoto(
                 shot.photoPath,
                 modifier = Modifier
                     .weight(1f, fill = false)
-                    .align(Alignment.CenterHorizontally)
-                    .heightIn(min = PhotoMinHeight, max = PhotoMaxHeight)
-                    .aspectRatio(4f / 3f),
+                    .heightIn(min = VerdictPhotoMinHeight, max = VerdictPhotoMaxHeight)
+                    .fillMaxWidth()
+                    .fillMaxHeight(),
             )
-            Column {
-                shot.questions.forEachIndexed { index, question ->
-                    CriterionRow(
-                        question,
-                        yes = answers.getOrElse(index) { false },
-                        corrected = shot.corrected.getOrElse(index) { false },
-                        onTap = { onFlip(index) },
-                    )
-                }
-                Text(
-                    "Tap a check to change it.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp),
+            Spacer(Modifier.height(12.dp))
+            shot.questions.forEachIndexed { index, question ->
+                CriterionRow(
+                    question,
+                    yes = answers.getOrElse(index) { false },
+                    corrected = shot.corrected.getOrElse(index) { false },
+                    last = index == shot.questions.lastIndex,
+                    onTap = { onFlip(index) },
                 )
             }
+            Text(
+                "Tap a check to change it.",
+                style = MaterialTheme.typography.caption,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
         }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            content = buttons,
-        )
+        Spacer(Modifier.height(ButtonsGap))
+        actions()
     }
 }
 
 /**
- * Check paused: the check of the photo failed. The title, one line of text and the photo, laid
- * out like Not yet, then [buttons] at the bottom. No result is shown.
+ * Check paused and Photo taken: the top bar, the photo as on Checking, [title], then [below]
+ * (the error card, or a line of text), and [actions] at the bottom. No result is shown.
  */
 @Composable
-private fun CheckPausedScreen(
+private fun PhotoStatusScreen(
+    walk: Walk,
     shot: Shot,
+    title: String,
     modifier: Modifier = Modifier,
-    buttons: @Composable RowScope.() -> Unit,
+    actions: @Composable () -> Unit,
+    below: @Composable ColumnScope.() -> Unit,
 ) {
     Column(modifier = modifier) {
         Column(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Column {
-                Text(
-                    "Check paused",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text("Couldn't check this photo.", style = MaterialTheme.typography.titleLarge)
-            }
-            WalkPhoto(
-                shot.photoPath,
-                modifier = Modifier
-                    .weight(1f, fill = false)
-                    .align(Alignment.CenterHorizontally)
-                    .heightIn(min = 80.dp)
-                    .aspectRatio(4f / 3f),
-            )
+            TopBar(walk)
+            Spacer(Modifier.height(PhotoGap))
+            StatusPhoto(shot.photoPath)
+            Spacer(Modifier.height(StatusGap))
+            StatusTitle(title)
+            below()
         }
-        Row(
+        Spacer(Modifier.height(ButtonsGap))
+        actions()
+    }
+}
+
+/** The photo on Checking, Check paused and Photo taken: full width at 4:3, smaller if it must. */
+@Composable
+private fun ColumnScope.StatusPhoto(path: String?) {
+    WalkPhoto(
+        path,
+        modifier = Modifier
+            .weight(1f, fill = false)
+            .aspectRatio(4f / 3f),
+    )
+}
+
+/** "Checking", "Check paused", "Photo taken": centred, in the Verdict style. */
+@Composable
+private fun StatusTitle(text: String) {
+    Text(text, style = MaterialTheme.typography.verdict, textAlign = TextAlign.Center)
+}
+
+/** A centred line in the secondary colour, such as "You can keep looking around.". */
+@Composable
+private fun SecondaryLine(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+    )
+}
+
+/** The indeterminate check indicator: 180 dp wide, primary on its light track. */
+@Composable
+private fun CheckingIndicator() {
+    LinearProgressIndicator(
+        modifier = Modifier.width(CheckingProgressWidth),
+        trackColor = PrimaryTint,
+    )
+}
+
+/**
+ * The actions at the bottom: the main button ([label], with [icon] before it when given), full
+ * width, and under it, 8 dp apart, the text action [secondaryLabel] when given.
+ */
+@Composable
+private fun Actions(
+    label: String,
+    icon: Int?,
+    onClick: () -> Unit,
+    secondaryLabel: String? = null,
+    onSecondary: () -> Unit = {},
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(ActionGap),
+    ) {
+        Button(
+            onClick = onClick,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            content = buttons,
-        )
-    }
-}
-
-@Composable
-private fun MainButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Button(onClick = onClick, modifier = modifier.heightIn(min = BottomButtonHeight)) {
-        Text(label, style = MaterialTheme.typography.titleMedium)
-    }
-}
-
-@Composable
-private fun SecondaryButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    OutlinedButton(onClick = onClick, modifier = modifier.heightIn(min = BottomButtonHeight)) {
-        Text(label, style = MaterialTheme.typography.titleMedium)
+                .height(MainButtonHeight),
+        ) {
+            if (icon != null) {
+                Icon(
+                    painter = painterResource(icon),
+                    contentDescription = null,
+                    modifier = Modifier.size(ButtonIconSize),
+                )
+                Spacer(Modifier.width(8.dp))
+            }
+            Text(label, style = MaterialTheme.typography.button)
+        }
+        if (secondaryLabel != null) {
+            TextButton(
+                onClick = onSecondary,
+                modifier = Modifier.heightIn(min = SecondaryActionHeight),
+            ) {
+                Text(secondaryLabel, style = MaterialTheme.typography.button)
+            }
+        }
     }
 }
 
@@ -448,68 +515,71 @@ private fun previewWalk(): Walk = Walk.start(
     0L,
 ).copy(currentIndex = 1)
 
+/** Room for a 24 dp status bar and a 48 dp three-button navigation bar, as on a 360 x 800 dp phone. */
+private val PreviewBars = Modifier.padding(top = 24.dp, bottom = 48.dp)
+
 private fun Walk.withPreviewPhoto(): Walk = photoRequested("/preview/photo.jpg").photoTaken()
 
-@Preview(showBackground = true, widthDp = 360, heightDp = 800)
+@Preview(showBackground = true, backgroundColor = 0xFFFAFAF7, widthDp = 360, heightDp = 800)
 @Composable
 private fun NextPicturePreview() {
     LookaboutTheme {
-        WalkScreen(previewWalk(), false, false, {}, {}, {}, {}, {}, {}, {})
+        WalkScreen(previewWalk(), false, false, {}, {}, {}, {}, {}, {}, {}, modifier = PreviewBars)
     }
 }
 
-@Preview(showBackground = true, widthDp = 360, heightDp = 800)
+@Preview(showBackground = true, backgroundColor = 0xFFFAFAF7, widthDp = 360, heightDp = 800)
 @Composable
 private fun CheckingPreview() {
     LookaboutTheme {
-        WalkScreen(previewWalk().withPreviewPhoto(), true, false, {}, {}, {}, {}, {}, {}, {})
+        WalkScreen(previewWalk().withPreviewPhoto(), true, false, {}, {}, {}, {}, {}, {}, {}, modifier = PreviewBars)
     }
 }
 
-@Preview(showBackground = true, widthDp = 360, heightDp = 800)
+@Preview(showBackground = true, backgroundColor = 0xFFFAFAF7, widthDp = 360, heightDp = 800)
 @Composable
 private fun AcceptedPreview() {
     val walk = previewWalk().withPreviewPhoto().recordCheck(listOf(true, true, false, true), 2000)
     LookaboutTheme {
-        WalkScreen(walk, false, false, {}, {}, {}, {}, {}, {}, {})
+        WalkScreen(walk, false, false, {}, {}, {}, {}, {}, {}, {}, modifier = PreviewBars)
     }
 }
 
-@Preview(showBackground = true, widthDp = 360, heightDp = 800)
+@Preview(showBackground = true, backgroundColor = 0xFFFAFAF7, widthDp = 360, heightDp = 800)
 @Composable
 private fun NotYetPreview() {
     val walk = previewWalk().withPreviewPhoto().recordCheck(listOf(false, true, false, false), 2000)
     LookaboutTheme {
-        WalkScreen(walk, false, false, {}, {}, {}, {}, {}, {}, {})
+        WalkScreen(walk, false, false, {}, {}, {}, {}, {}, {}, {}, modifier = PreviewBars)
     }
 }
 
-@Preview(showBackground = true, widthDp = 360, heightDp = 800)
+@Preview(showBackground = true, backgroundColor = 0xFFFAFAF7, widthDp = 360, heightDp = 800)
 @Composable
 private fun CheckPausedPreview() {
     LookaboutTheme {
-        WalkScreen(previewWalk().withPreviewPhoto(), false, true, {}, {}, {}, {}, {}, {}, {})
+        WalkScreen(previewWalk().withPreviewPhoto(), false, true, {}, {}, {}, {}, {}, {}, {}, modifier = PreviewBars)
     }
 }
 
-@Preview(showBackground = true, widthDp = 360, heightDp = 800)
+@Preview(showBackground = true, backgroundColor = 0xFFFAFAF7, widthDp = 360, heightDp = 800)
 @Composable
 private fun PhotoTakenPreview() {
     LookaboutTheme {
-        WalkScreen(previewWalk().copy(checkAtEnd = true).withPreviewPhoto(), false, false, {}, {}, {}, {}, {}, {}, {})
+        WalkScreen(previewWalk().copy(checkAtEnd = true).withPreviewPhoto(), false, false, {}, {}, {}, {}, {}, {}, {}, modifier = PreviewBars)
     }
 }
 
-@Preview(showBackground = true, widthDp = 360, heightDp = 800)
+@Preview(showBackground = true, backgroundColor = 0xFFFAFAF7, widthDp = 360, heightDp = 800)
 @Composable
 private fun EndCheckPreview() {
     val walk = previewWalk().copy(checkAtEnd = true).withPreviewPhoto().copy(currentIndex = 5)
     LookaboutTheme {
-        EndCheckScreen(walk, shotIndex = 1)
+        EndCheckScreen(walk, shotIndex = 1, modifier = PreviewBars)
     }
 }
 
-@Preview(showBackground = true, widthDp = 360, heightDp = 800)
+@Preview(showBackground = true, backgroundColor = 0xFFFAFAF7, widthDp = 360, heightDp = 800)
 @Composable
 private fun EndCheckWaitingPreview() {
     val walk = previewWalk().copy(checkAtEnd = true).withPreviewPhoto().copy(currentIndex = 5)
@@ -517,6 +587,7 @@ private fun EndCheckWaitingPreview() {
         EndCheckScreen(
             walk,
             shotIndex = 1,
+            modifier = PreviewBars,
             waitingForModel = true,
             modelUnavailable = true,
             canShowResultsNow = true,
@@ -526,10 +597,10 @@ private fun EndCheckWaitingPreview() {
 
 /**
  * Not yet with all four answers changed by the walker, at 360 x 800 dp with room left for a 24 dp
- * status bar and a 48 dp navigation bar: the photo gives up height so the hint and both buttons
- * stay clear of the criteria.
+ * status bar and a 48 dp navigation bar: the photo gives up height, down to 80 dp, so the hint and
+ * both buttons stay clear of the criteria.
  */
-@Preview(showBackground = true, widthDp = 360, heightDp = 800)
+@Preview(showBackground = true, backgroundColor = 0xFFFAFAF7, widthDp = 360, heightDp = 800)
 @Composable
 private fun NotYetCorrectedPreview() {
     val walk = previewWalk().withPreviewPhoto()
@@ -541,7 +612,7 @@ private fun NotYetCorrectedPreview() {
             false,
             false,
             {}, {}, {}, {}, {}, {}, {},
-            modifier = Modifier.padding(top = 24.dp, bottom = 48.dp),
+            modifier = PreviewBars,
         )
     }
 }
