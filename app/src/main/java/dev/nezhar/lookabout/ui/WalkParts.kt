@@ -1,7 +1,6 @@
 package dev.nezhar.lookabout.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +22,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
@@ -30,36 +31,51 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import dev.nezhar.lookabout.R
 import dev.nezhar.lookabout.largestThatFits
 import dev.nezhar.lookabout.ui.theme.Accepted
+import dev.nezhar.lookabout.ui.theme.AcceptedTint
+import dev.nezhar.lookabout.ui.theme.ChipRadius
+import dev.nezhar.lookabout.ui.theme.CorrectionExtra
+import dev.nezhar.lookabout.ui.theme.CorrectionFill
+import dev.nezhar.lookabout.ui.theme.CriterionRowHeight
+import dev.nezhar.lookabout.ui.theme.ErrorCardHeight
+import dev.nezhar.lookabout.ui.theme.InactiveDot
+import dev.nezhar.lookabout.ui.theme.LastRowDivider
 import dev.nezhar.lookabout.ui.theme.NotYet
+import dev.nezhar.lookabout.ui.theme.NotYetTint
+import dev.nezhar.lookabout.ui.theme.PhotoRadius
+import dev.nezhar.lookabout.ui.theme.ProgressDotGap
+import dev.nezhar.lookabout.ui.theme.ProgressDotSize
+import dev.nezhar.lookabout.ui.theme.RowDivider
+import dev.nezhar.lookabout.ui.theme.RowIconSize
+import dev.nezhar.lookabout.ui.theme.SecondaryText
+import dev.nezhar.lookabout.ui.theme.VerdictCircleSize
+import dev.nezhar.lookabout.ui.theme.VerdictIconSize
+import dev.nezhar.lookabout.ui.theme.correction
+import dev.nezhar.lookabout.ui.theme.coverage
+import dev.nezhar.lookabout.ui.theme.criteria
+import dev.nezhar.lookabout.ui.theme.prompts
+import dev.nezhar.lookabout.ui.theme.verdict
 import java.io.File
 
-/** The three sizes of the picture text on Next picture, largest first. */
-private val PictureTextSizes = listOf(48.sp, 40.sp, 32.sp)
-
 /**
- * The picture text in the largest of [PictureTextSizes] that fits the space it is given: every
- * line within the height and no word wider than a line. Measured before drawing, so the text is
- * drawn once at its final size. When none fits, the smallest is used.
+ * The picture text in the largest of the three prompt sizes ([prompts]: 57, 45 and 36 sp) that
+ * fits the space it is given: every line within the height and no word wider than a line, so no
+ * word is split across lines. Measured before drawing, so the text is drawn once at its final
+ * size. When none fits, the smallest is used.
  */
 @Composable
 fun PictureText(text: String, modifier: Modifier = Modifier) {
     val measurer = rememberTextMeasurer()
-    val base = MaterialTheme.typography.headlineLarge
+    val styles = MaterialTheme.typography.prompts
     BoxWithConstraints(modifier) {
         val space = constraints
-        val style = remember(text, space, base, measurer) {
-            val styles = PictureTextSizes.map { size ->
-                base.copy(fontSize = size, lineHeight = size * 1.2f, fontWeight = FontWeight.Medium)
-            }
+        val style = remember(text, space, styles, measurer) {
             val words = text.split(' ').filter { it.isNotEmpty() }
             largestThatFits(styles) { style ->
                 val wordsFit = words.all { word ->
@@ -77,34 +93,32 @@ fun PictureText(text: String, modifier: Modifier = Modifier) {
 }
 
 /**
- * One dot per picture: pictures behind the walker filled, the current one filled and larger,
- * the ones ahead as rings. Decoration only; the position text says the same.
+ * One 8 dp dot per picture, 14 dp centre to centre: the pictures done and the current one in the
+ * primary colour, the ones ahead grey. Decoration only; the counter says the same.
  */
 @Composable
 fun ProgressDots(count: Int, current: Int, modifier: Modifier = Modifier) {
-    val filled = MaterialTheme.colorScheme.primary
-    val ring = MaterialTheme.colorScheme.outline
+    val reached = MaterialTheme.colorScheme.primary
     Row(
         modifier = modifier.clearAndSetSemantics {},
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(ProgressDotGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         repeat(count) { index ->
-            val dot = Modifier.size(if (index == current) 14.dp else 10.dp).clip(CircleShape)
             Box(
-                modifier = if (index <= current) {
-                    dot.background(filled)
-                } else {
-                    dot.border(1.5.dp, ring, CircleShape)
-                },
+                modifier = Modifier
+                    .size(ProgressDotSize)
+                    .clip(CircleShape)
+                    .background(if (index <= current) reached else InactiveDot),
             )
         }
     }
 }
 
 /**
- * A walk photo, decoded off the main thread at the size shown, cropped to fill [modifier]'s size.
- * Without a path, or while loading, or when the file cannot be read, a plain box stands in for it.
+ * A walk photo, decoded off the main thread at the size shown, cropped to fill [modifier]'s size,
+ * with 16 dp corners. Without a path, or while loading, or when the file cannot be read, a plain
+ * box stands in for it.
  */
 @Composable
 fun WalkPhoto(path: String?, modifier: Modifier = Modifier) {
@@ -113,7 +127,7 @@ fun WalkPhoto(path: String?, modifier: Modifier = Modifier) {
     AsyncImage(
         model = path?.let { File(it) },
         contentDescription = "Your photo",
-        modifier = modifier.clip(RoundedCornerShape(12.dp)),
+        modifier = modifier.clip(RoundedCornerShape(PhotoRadius)),
         placeholder = painter,
         error = painter,
         fallback = painter,
@@ -121,74 +135,119 @@ fun WalkPhoto(path: String?, modifier: Modifier = Modifier) {
     )
 }
 
-/** The verdict: "Accepted" or "Not yet", each with its own icon and colour. */
+/**
+ * The verdict: a tick in a green circle and "Accepted", or a pause in an amber circle and
+ * "Not yet", in the Verdict style, with the [coverage] line ("75%, 3 of 4") under them in the
+ * same colour. 48 dp for the circle row plus 24 dp for the coverage line.
+ */
 @Composable
-fun VerdictHeader(accepted: Boolean, modifier: Modifier = Modifier) {
+fun VerdictHeader(accepted: Boolean, coverage: String, modifier: Modifier = Modifier) {
     val color = if (accepted) Accepted else NotYet
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            painter = painterResource(if (accepted) R.drawable.ic_accepted else R.drawable.ic_not_yet),
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(36.dp),
-        )
-        Text(
-            if (accepted) "Accepted" else "Not yet",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = color,
-        )
+    Column(modifier = modifier) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(
+                modifier = Modifier
+                    .size(VerdictCircleSize)
+                    .clip(CircleShape)
+                    .background(if (accepted) AcceptedTint else NotYetTint),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter = painterResource(if (accepted) R.drawable.ic_tick else R.drawable.ic_pause),
+                    contentDescription = null,
+                    tint = color,
+                    modifier = Modifier.size(VerdictIconSize),
+                )
+            }
+            Text(
+                if (accepted) "Accepted" else "Not yet",
+                style = MaterialTheme.typography.verdict,
+                color = color,
+            )
+        }
+        Text(coverage, style = MaterialTheme.typography.coverage, color = color)
     }
 }
 
-/** The fill of a criterion whose answer the walker changed. */
-private val CorrectedFill = Color(0xFFDCECF2)
-
 /**
- * One criterion with a tick (YES) or a cross (NO), showing the answer after the walker's
- * correction. The whole row is the tap target: tapping it calls [onTap] to change the answer.
- * A [corrected] row is filled, has rounded corners, reads "Changed by you" under the question and
- * is 16 dp higher than an uncorrected one. At least 48 dp high (64 dp when corrected).
+ * One criterion with a green tick (YES) or a grey cross (NO), showing the answer after the
+ * walker's correction, and a line under it: a thin one, or a stronger one under the [last] row.
+ * The whole row is the tap target: tapping it calls [onTap] to change the answer. A [corrected]
+ * row is filled, has rounded corners and reads "Changed by you" under the question. At least
+ * 64 dp high, 80 dp when corrected; the icon is centred 20 dp from the row's start and the
+ * question starts 44 dp in.
  */
 @Composable
 fun CriterionRow(
     question: String,
     yes: Boolean,
     corrected: Boolean,
+    last: Boolean,
     onTap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val line = if (last) LastRowDivider else RowDivider
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = if (corrected) 64.dp else 48.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (corrected) CorrectedFill else Color.Transparent)
+            .heightIn(min = if (corrected) CriterionRowHeight + CorrectionExtra else CriterionRowHeight)
+            .drawWithContent {
+                drawContent()
+                val stroke = 1.dp.toPx()
+                val y = size.height - stroke / 2
+                drawLine(line, Offset(0f, y), Offset(size.width, y), strokeWidth = stroke)
+            }
+            .clip(RoundedCornerShape(ChipRadius))
+            .background(if (corrected) CorrectionFill else Color.Transparent)
             .clickable(onClickLabel = "Change the answer", role = Role.Button, onClick = onTap)
-            .padding(horizontal = 12.dp, vertical = 4.dp),
+            .padding(horizontal = 8.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             painter = painterResource(if (yes) R.drawable.ic_tick else R.drawable.ic_cross),
             contentDescription = if (yes) "Yes" else "No",
-            tint = if (yes) Accepted else NotYet,
-            modifier = Modifier.size(24.dp),
+            tint = if (yes) Accepted else SecondaryText,
+            modifier = Modifier.size(RowIconSize),
         )
         Column {
-            Text(question, style = MaterialTheme.typography.bodyLarge)
+            Text(question, style = MaterialTheme.typography.criteria)
             if (corrected) {
                 Text(
                     "Changed by you",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.correction,
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
         }
+    }
+}
+
+/**
+ * An error line in its card: an error icon and [text] in the error colour on a light red fill
+ * with 12 dp corners, at least 56 dp high. The icon is centred 24 dp from the card's start and
+ * the text starts 44 dp in, as in a criterion row.
+ */
+@Composable
+fun ErrorCard(text: String, modifier: Modifier = Modifier) {
+    val color = MaterialTheme.colorScheme.error
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = ErrorCardHeight)
+            .clip(RoundedCornerShape(ChipRadius))
+            .background(MaterialTheme.colorScheme.errorContainer)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_error),
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(RowIconSize),
+        )
+        Text(text, style = MaterialTheme.typography.bodyLarge, color = color)
     }
 }
 
