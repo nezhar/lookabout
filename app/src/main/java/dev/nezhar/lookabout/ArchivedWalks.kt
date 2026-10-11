@@ -4,6 +4,7 @@ import android.util.Log
 import dev.nezhar.lookabout.walk.ArchivedWalkSummary
 import dev.nezhar.lookabout.walk.Walk
 import dev.nezhar.lookabout.walk.WalkArchive
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -13,10 +14,11 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * The [WalkArchive] in [dir] for the app: [save] queues a write in the background, the other calls
- * are suspend functions that run on [Dispatchers.IO], so all are safe to call from the main thread.
+ * The [WalkArchive] in a folder for the app, one per folder for the whole process ([at]): [save]
+ * queues a write in the background, the other calls are suspend functions that run on
+ * [Dispatchers.IO], so all are safe to call from the main thread.
  */
-class ArchivedWalks(dir: File) {
+class ArchivedWalks private constructor(dir: File) {
     private val archive = WalkArchive(dir)
 
     // Not tied to a screen or ViewModel, so a save queued just before the app closes still runs.
@@ -30,8 +32,10 @@ class ArchivedWalks(dir: File) {
             for (walk in queue) {
                 try {
                     archive.save(walk)
-                } catch (e: Exception) {
-                    Log.w(Gemma.TAG, "Could not archive the walk", e)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (t: Throwable) {
+                    Log.w(Gemma.TAG, "Could not archive the walk", t)
                 }
             }
         }
@@ -50,4 +54,12 @@ class ArchivedWalks(dir: File) {
 
     /** Deletes the archived walk with [id], keeping its photos. True when it is gone. */
     suspend fun delete(id: Long): Boolean = withContext(Dispatchers.IO) { archive.delete(id) }
+
+    companion object {
+        private val byDir = HashMap<String, ArchivedWalks>()
+
+        /** The archive in [dir], the same instance every time, so two writers never race on its files. */
+        @Synchronized
+        fun at(dir: File): ArchivedWalks = byDir.getOrPut(dir.absolutePath) { ArchivedWalks(dir) }
+    }
 }

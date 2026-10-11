@@ -120,7 +120,7 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
     private val walkStore = WalkStore(File(application.filesDir, WALK_FILE_NAME))
 
     /** Every walk that reached Summary, with its results. */
-    val archivedWalks = ArchivedWalks(File(application.filesDir, WALK_ARCHIVE_DIR))
+    val archivedWalks = ArchivedWalks.at(File(application.filesDir, WALK_ARCHIVE_DIR))
 
     private val downloader = ModelDownloader(application)
 
