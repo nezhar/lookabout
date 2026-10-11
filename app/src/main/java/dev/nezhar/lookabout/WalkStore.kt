@@ -42,16 +42,21 @@ class WalkStore(private val file: File) {
             null
         }
 
-    /** Saves [saved] in the background, or deletes the saved walk when it is null. */
+    /** Saves [saved] in the background, or deletes the saved walk when it is null. A failed save is only logged. */
     fun save(saved: SavedWalk?) {
-        val text = saved?.let(::encodeSavedWalk)
+        val text = try {
+            saved?.let(::encodeSavedWalk)
+        } catch (e: Exception) {
+            Log.w(Gemma.TAG, "Could not save the walk", e)
+            return
+        }
         val write = latest.incrementAndGet()
         scope.launch {
             lock.withLock {
                 if (latest.get() != write) return@withLock
                 try {
                     if (text == null) clear() else writeAtomically(text)
-                } catch (e: IOException) {
+                } catch (e: Exception) {
                     Log.w(Gemma.TAG, "Could not save the walk", e)
                 }
             }
