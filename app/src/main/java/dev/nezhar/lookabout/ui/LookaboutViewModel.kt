@@ -18,6 +18,7 @@ import dev.nezhar.lookabout.backTarget
 import dev.nezhar.lookabout.checkPhoto
 import dev.nezhar.lookabout.modelPath
 import dev.nezhar.lookabout.walk.Walk
+import dev.nezhar.lookabout.walk.isAccepted
 import dev.nezhar.lookabout.walk.pickBuiltInPictures
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -214,7 +215,7 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
                     pausedCheck = PausedCheck(index, path)
                 } else {
                     updateWalk { w ->
-                        if (w.shots.getOrNull(index)?.photoPath == path) w.recordCheck(answers, result.modelMs, index) else w
+                        if (w.shots.getOrNull(index)?.photoPath == path) w.recordCheck(answers, result.modelMs, index).also { buzzVerdict(app, isAccepted(answers)) } else w
                     }
                 }
             } finally {
