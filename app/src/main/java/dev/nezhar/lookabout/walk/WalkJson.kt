@@ -15,7 +15,7 @@ data class SavedWalk(
     val onSummary: Boolean,
 )
 
-/** The whole walk as JSON, with its pending photo path and whether Summary was open. */
+/** The whole walk as JSON, with its pending photo path, check-at-end setting and whether Summary was open. */
 fun encodeSavedWalk(saved: SavedWalk): String {
     val walk = saved.walk
     val shots = JSONArray()
@@ -28,6 +28,7 @@ fun encodeSavedWalk(saved: SavedWalk): String {
         .put("startedAtMillis", walk.startedAtMillis)
         .put("currentIndex", walk.currentIndex)
         .put("pendingPhotoPath", walk.pendingPhotoPath ?: JSONObject.NULL)
+        .put("checkAtEnd", walk.checkAtEnd)
         .put("shots", shots)
         .toString()
 }
@@ -50,6 +51,8 @@ fun decodeSavedWalk(text: String): SavedWalk? =
                 shots = (0 until shots.length()).map { decodeShot(shots.getJSONObject(it)) },
                 currentIndex = json.getInt("currentIndex"),
                 pendingPhotoPath = json.stringOrNull("pendingPhotoPath"),
+                // Missing in walks saved before the setting existed: those check each photo at once.
+                checkAtEnd = if (json.has("checkAtEnd")) json.getBoolean("checkAtEnd") else false,
             )
             SavedWalk(walk, json.getBoolean("onSummary"))
         }

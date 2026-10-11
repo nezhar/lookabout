@@ -45,6 +45,7 @@ fun LookaboutApp(noticeTaps: Int = 0, viewModel: LookaboutViewModel = viewModel(
         val list = viewModel.list
         val walk = viewModel.walk
         val writingCount = viewModel.writingCount
+        val endCheckIndex = viewModel.endCheckIndex
         when {
             screen == Screen.List && writingCount != null -> ListProgress(
                 count = writingCount,
@@ -57,6 +58,11 @@ fun LookaboutApp(noticeTaps: Int = 0, viewModel: LookaboutViewModel = viewModel(
                     askNotifications()
                 },
                 onNewList = viewModel::newList,
+                modifier = modifier,
+            )
+            screen == Screen.Walk && walk != null && endCheckIndex != null -> EndCheckScreen(
+                walk = walk,
+                shotIndex = endCheckIndex,
                 modifier = modifier,
             )
             screen == Screen.Walk && walk != null -> WalkScreen(

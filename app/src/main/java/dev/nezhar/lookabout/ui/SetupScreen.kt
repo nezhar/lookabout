@@ -5,10 +5,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -20,12 +23,15 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.nezhar.lookabout.MAX_OWN_TOPIC_CHARS
@@ -38,7 +44,8 @@ import dev.nezhar.lookabout.downloadProgressText
 import dev.nezhar.lookabout.ui.theme.LookaboutTheme
 
 /**
- * Setup: the number of pictures, the topic and the sky, then Make my list. Without a model file,
+ * Setup: the number of pictures, the topic, the sky and whether to check the photos at the end,
+ * then Make my list. Without a model file,
  * Download the model takes the place of Make my list, with its progress and Cancel while it runs.
  * A long press on the title opens the debug screen; nothing on screen shows it.
  */
@@ -132,6 +139,11 @@ fun SetupScreen(
                 }
                 LocationAsk()
             }
+
+            CheckAtEndSwitch(
+                on = choices.checkAtEnd,
+                onChange = { onChoicesChange(choices.withCheckAtEnd(it)) },
+            )
         }
 
         Column(
@@ -205,6 +217,33 @@ fun SetupScreen(
                 }
             }
         }
+    }
+}
+
+/**
+ * "Check photos at the end": the walk takes every photo without waiting and checks them all at
+ * Finish walk. The whole row, at least 48 dp high, toggles the switch.
+ */
+@Composable
+private fun CheckAtEndSwitch(on: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .toggleable(value = on, role = Role.Switch, onValueChange = onChange),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Check photos at the end", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Shoot without waiting. Every photo is checked at Finish walk.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        // The row handles the tap, so the switch itself takes none.
+        Switch(checked = on, onCheckedChange = null)
     }
 }
 

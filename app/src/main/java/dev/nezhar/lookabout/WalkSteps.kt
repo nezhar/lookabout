@@ -3,27 +3,59 @@ package dev.nezhar.lookabout
 import dev.nezhar.lookabout.walk.Outcome
 import dev.nezhar.lookabout.walk.QUESTIONS_PER_PICTURE
 import dev.nezhar.lookabout.walk.Shot
+import dev.nezhar.lookabout.walk.Walk
 
-/** The screens Walk repeats for every picture; CheckPaused only after a failed check. */
+/**
+ * The screens Walk repeats for every picture; CheckPaused only after a failed check, PhotoTaken
+ * only when the photos are checked at the end of the walk.
+ */
 enum class WalkStep {
     NextPicture,
     Checking,
     Accepted,
     NotYet,
     CheckPaused,
+    PhotoTaken,
 }
 
 /**
  * The screen Walk shows for [shot]: Checking while a check runs, a verdict once the photo is
- * checked, Check paused when the check of its photo failed ([paused]), and Next picture otherwise
- * (no photo yet, or a photo whose check is not in).
+ * checked, Photo taken for an unchecked photo when photos are checked at the end ([checkAtEnd]),
+ * Check paused when the check of its photo failed ([paused]), and Next picture otherwise (no
+ * photo yet, or a photo whose check is not in).
  */
-fun walkStep(shot: Shot, checking: Boolean, paused: Boolean = false): WalkStep = when {
+fun walkStep(shot: Shot, checking: Boolean, paused: Boolean = false, checkAtEnd: Boolean = false): WalkStep = when {
     checking -> WalkStep.Checking
     shot.isChecked && shot.outcome == Outcome.ACCEPTED -> WalkStep.Accepted
     shot.isChecked -> WalkStep.NotYet
+    checkAtEnd && shot.hasPhoto -> WalkStep.PhotoTaken
     paused && shot.hasPhoto -> WalkStep.CheckPaused
     else -> WalkStep.NextPicture
+}
+
+/**
+ * True when [walk] is due for its check at the end: photos are checked at the end, the walker has
+ * moved past the last picture (Finish walk, or Skip on the last) and Summary is not open yet. The
+ * photos still to check are [Walk.shotsToCheck]; a photo whose check failed stays among them.
+ */
+fun checksAtEnd(walk: Walk, onSummary: Boolean): Boolean =
+    walk.checkAtEnd && walk.current == null && !onSummary
+
+/**
+ * The end check's position for the photo of shot [shotIndex] among the walk's photos, such as
+ * "Checking 2 of 5" for the second of five photos. Shots without a photo are not counted.
+ */
+fun endCheckText(walk: Walk, shotIndex: Int): String {
+    val withPhoto = walk.shots.indices.filter { walk.shots[it].hasPhoto }
+    val position = withPhoto.indexOf(shotIndex).coerceAtLeast(0)
+    return "Checking ${positionText(position, withPhoto.size)}"
+}
+
+/** How far the end check is, 0 to 1: the photos before [shotIndex] out of all of the walk's photos. */
+fun endCheckProgress(walk: Walk, shotIndex: Int): Float {
+    val withPhoto = walk.shots.indices.filter { walk.shots[it].hasPhoto }
+    if (withPhoto.isEmpty()) return 0f
+    return withPhoto.count { it < shotIndex }.toFloat() / withPhoto.size
 }
 
 /** A failed check: the shot at [shotIndex] and the photo the check was made for. */

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -24,6 +25,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.nezhar.lookabout.WalkStep
 import dev.nezhar.lookabout.coverageText
+import dev.nezhar.lookabout.endCheckProgress
+import dev.nezhar.lookabout.endCheckText
 import dev.nezhar.lookabout.positionText
 import dev.nezhar.lookabout.ui.theme.LookaboutTheme
 import dev.nezhar.lookabout.walk.Picture
@@ -43,16 +46,18 @@ private val PhotoMinHeight = 80.dp
 
 /**
  * Walk: one picture at a time, in four screens: Next picture, Checking, Accepted and Not yet,
- * plus Check paused after a failed check. Which one shows follows from the current shot,
- * [checking] and [checkPaused] (see [walkStep]). The screen stays on while Checking shows.
+ * plus Check paused after a failed check. When the walk checks its photos at the end, Photo
+ * taken shows instead of Checking after Shoot. Which one shows follows from the current shot,
+ * [checking], [checkPaused] and the walk's setting (see [walkStep]). The screen stays on while
+ * Checking shows.
  *
  * @param checking true while the current photo is being checked; no actions are offered then.
  * @param checkPaused true when the check of the current photo failed.
  * @param onShoot takes a photo for the current picture (Next picture).
  * @param onSkip moves on without an accepted photo (Next picture, Not yet, Check paused); on the last picture it opens Summary.
- * @param onRetake takes a new photo for the current picture (Not yet).
+ * @param onRetake takes a new photo for the current picture (Not yet, Photo taken).
  * @param onTryAgain checks the same photo again (Check paused).
- * @param onNextPicture moves on after Accepted; on the last picture this is Finish walk and opens Summary.
+ * @param onNextPicture moves on after Accepted or Photo taken; on the last picture this is Finish walk.
  * @param onFinish opens Summary; only offered if the walk is already past its last picture.
  * @param onFlip changes the answer to a question (0 to 3) on Accepted and Not yet; a second tap
  *   restores Gemma's answer.
@@ -82,7 +87,7 @@ fun WalkScreen(
         }
         return
     }
-    when (walkStep(shot, checking, checkPaused)) {
+    when (walkStep(shot, checking, checkPaused, walk.checkAtEnd)) {
         WalkStep.NextPicture -> NextPictureScreen(walk, shot, onShoot, onSkip, screenModifier)
         WalkStep.Checking -> {
             KeepScreenOn()
@@ -103,6 +108,100 @@ fun WalkScreen(
             SecondaryButton("Skip", onSkip, Modifier.weight(1f))
             MainButton("Try again", onTryAgain, Modifier.weight(1f))
         }
+        WalkStep.PhotoTaken -> PhotoTakenScreen(walk, shot, modifier = screenModifier) {
+            SecondaryButton("Retake", onRetake, Modifier.weight(1f))
+            MainButton(
+                if (walk.isLast) "Finish walk" else "Next picture",
+                onNextPicture,
+                Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+/**
+ * The check at the end of the walk: "Checking 2 of 5" with a spinner, how far the check is, and
+ * the picture and photo being checked. No actions; the screen stays on.
+ *
+ * @param shotIndex the shot whose photo is being checked.
+ */
+@Composable
+fun EndCheckScreen(walk: Walk, shotIndex: Int, modifier: Modifier = Modifier) {
+    KeepScreenOn()
+    val shot = walk.shots.getOrNull(shotIndex)
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CircularProgressIndicator(modifier = Modifier.size(32.dp))
+            Text(endCheckText(walk, shotIndex), style = MaterialTheme.typography.headlineMedium)
+        }
+        LinearProgressIndicator(
+            progress = { endCheckProgress(walk, shotIndex) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (shot != null) {
+            Text(shot.text, style = MaterialTheme.typography.titleLarge)
+            WalkPhoto(
+                shot.photoPath,
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .align(Alignment.CenterHorizontally)
+                    .aspectRatio(3f / 4f),
+            )
+        }
+    }
+}
+
+/**
+ * Photo taken, when the photos are checked at the end: the position, the title, one line of text
+ * and the photo, laid out like Check paused, then [buttons] at the bottom. No result is shown.
+ */
+@Composable
+private fun PhotoTakenScreen(
+    walk: Walk,
+    shot: Shot,
+    modifier: Modifier = Modifier,
+    buttons: @Composable RowScope.() -> Unit,
+) {
+    Column(modifier = modifier) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            PositionRow(walk)
+            Column {
+                Text(
+                    "Photo taken",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text("Checked at the end of the walk.", style = MaterialTheme.typography.titleLarge)
+            }
+            WalkPhoto(
+                shot.photoPath,
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .align(Alignment.CenterHorizontally)
+                    .heightIn(min = 80.dp)
+                    .aspectRatio(4f / 3f),
+            )
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            content = buttons,
+        )
     }
 }
 
@@ -360,6 +459,23 @@ private fun NotYetPreview() {
 private fun CheckPausedPreview() {
     LookaboutTheme {
         WalkScreen(previewWalk().withPreviewPhoto(), false, true, {}, {}, {}, {}, {}, {}, {})
+    }
+}
+
+@Preview(showBackground = true, widthDp = 360, heightDp = 800)
+@Composable
+private fun PhotoTakenPreview() {
+    LookaboutTheme {
+        WalkScreen(previewWalk().copy(checkAtEnd = true).withPreviewPhoto(), false, false, {}, {}, {}, {}, {}, {}, {})
+    }
+}
+
+@Preview(showBackground = true, widthDp = 360, heightDp = 800)
+@Composable
+private fun EndCheckPreview() {
+    val walk = previewWalk().copy(checkAtEnd = true).withPreviewPhoto().copy(currentIndex = 5)
+    LookaboutTheme {
+        EndCheckScreen(walk, shotIndex = 1)
     }
 }
 

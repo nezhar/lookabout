@@ -95,4 +95,16 @@ class SetupTest {
         assertEquals(0, walk.currentIndex)
         assertTrue(walk.shots.all { it.outcome == Outcome.PENDING })
     }
+
+    @Test
+    fun checkAtEndIsOffByDefaultAndCarriesIntoTheWalk() {
+        assertFalse(SetupChoices().checkAtEnd)
+        val on = SetupChoices().withCheckAtEnd(true)
+        assertTrue(on.checkAtEnd)
+        assertFalse(on.withCheckAtEnd(false).checkAtEnd)
+
+        val list = ChallengeList("Reflections", "Rain", builtInPictures.take(3))
+        assertFalse(list.startWalk(1L).checkAtEnd)
+        assertTrue(list.startWalk(1L, on.checkAtEnd).checkAtEnd)
+    }
 }

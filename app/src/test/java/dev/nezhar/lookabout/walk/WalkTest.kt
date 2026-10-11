@@ -292,6 +292,63 @@ class WalkTest {
         assertEquals(16, walk.checkCount)
     }
 
+    private fun walkCheckedAtEnd(count: Int = 3) =
+        Walk.start("Autumn in the city", "Overcast", pictures(count), START, checkAtEnd = true)
+
+    @Test
+    fun aWalkChecksEachPhotoAtOnceByDefault() {
+        assertFalse(walk().checkAtEnd)
+        assertTrue(walkCheckedAtEnd().checkAtEnd)
+    }
+
+    @Test
+    fun withoutCheckAtEndAnUncheckedPhotoCannotMoveOn() {
+        val taken = walk().shoot("/p/1.jpg")
+        assertFalse(taken.canMoveOn)
+        assertEquals(taken, taken.nextPicture())
+    }
+
+    @Test
+    fun withCheckAtEndAPhotoMovesOnUnchecked() {
+        val fresh = walkCheckedAtEnd()
+        assertFalse(fresh.canMoveOn)
+        assertEquals(fresh, fresh.nextPicture())
+
+        val moved = fresh.shoot("/p/1.jpg").nextPicture()
+        assertEquals(1, moved.currentIndex)
+        assertEquals("/p/1.jpg", moved.shots[0].photoPath)
+        assertEquals(Outcome.PENDING, moved.shots[0].outcome)
+        assertFalse(moved.shots[0].isChecked)
+    }
+
+    @Test
+    fun withCheckAtEndFinishWalkOnTheLastMovesPastIt() {
+        val end = walkCheckedAtEnd().shoot("/p/1.jpg").nextPicture()
+            .shoot("/p/2.jpg").nextPicture()
+            .shoot("/p/3.jpg").nextPicture()
+        assertEquals(3, end.currentIndex)
+        assertNull(end.current)
+        assertTrue(end.isFinished)
+        assertFalse(end.canMoveOn)
+    }
+
+    @Test
+    fun shotsToCheckAreThePhotosWithoutACheck() {
+        val taken = walkCheckedAtEnd(5)
+            .shoot("/p/1.jpg").nextPicture()
+            .skip()
+            .shoot("/p/3.jpg").nextPicture()
+            .shoot("/p/4.jpg").nextPicture()
+        assertEquals(listOf(0, 2, 3), taken.shotsToCheck)
+
+        val checked = taken.recordCheck(listOf(Y, Y, N, N), 2_000L, shotIndex = 2)
+        assertEquals(listOf(0, 3), checked.shotsToCheck)
+        assertEquals(Outcome.ACCEPTED, checked.shots[2].outcome)
+        assertEquals(4, checked.currentIndex)
+
+        assertEquals(emptyList<Int>(), walk(3).shotsToCheck)
+    }
+
     private companion object {
         const val START = 1_760_000_000_000L
         const val Y = true
