@@ -13,6 +13,7 @@ import dev.nezhar.lookabout.ChallengeList
 import dev.nezhar.lookabout.DOWNLOAD_POLL_MS
 import dev.nezhar.lookabout.DownloadStep
 import dev.nezhar.lookabout.Gemma
+import dev.nezhar.lookabout.ModelChoice
 import dev.nezhar.lookabout.ModelDownloader
 import dev.nezhar.lookabout.ModelStart
 import dev.nezhar.lookabout.PausedCheck
@@ -28,11 +29,17 @@ import dev.nezhar.lookabout.checksAtEnd
 import dev.nezhar.lookabout.copyToGallery
 import dev.nezhar.lookabout.downloadStep
 import dev.nezhar.lookabout.listPrompt
+import dev.nezhar.lookabout.missingModelText
+import dev.nezhar.lookabout.modelFile
 import dev.nezhar.lookabout.modelPath
 import dev.nezhar.lookabout.modelStart
 import dev.nezhar.lookabout.monthName
 import dev.nezhar.lookabout.sunHere
+import dev.nezhar.lookabout.offersModelChoice
+import dev.nezhar.lookabout.saveModelChoice
+import dev.nezhar.lookabout.savedModelChoice
 import dev.nezhar.lookabout.timeOfDay
+import dev.nezhar.lookabout.usableModelChoice
 import dev.nezhar.lookabout.waitsForPhoto
 import dev.nezhar.lookabout.walkNotice
 import dev.nezhar.lookabout.walk.SavedWalk
@@ -106,6 +113,17 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
     /** True once the walker has moved on to Summary for the current walk; saved with the walk. */
     private var onSummary = false
 
+    /** The model chosen on Debug: E2B unless E4B was chosen on a phone with the memory for it. */
+    var modelChoice by mutableStateOf(ModelChoice.E2B)
+        private set
+
+    /** True on phones with the memory for E4B: Debug offers the choice of model. */
+    val canChooseModel: Boolean = offersModelChoice(application)
+
+    /** Debug's line about the last change of model, e.g. a missing E4B file; null for none. */
+    var modelChoiceMessage by mutableStateOf<String?>(null)
+        private set
+
     init {
         loadModel()
     }
@@ -117,20 +135,63 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
     fun loadModel() {
         if (loadJob?.isActive == true || model == ModelState.Ready) return
         model = ModelState.Loading
+        launchModelJob { startModel() }
+    }
+
+    /**
+     * The choice of model on Debug: closes the loaded model and loads [choice] the usual way.
+     * A missing file keeps the current model and says so. Ignored while the model loads or
+     * downloads, and on phones that do not offer the choice.
+     */
+    fun chooseModel(choice: ModelChoice) {
+        if (!canChooseModel || choice == modelChoice) return
+        if (loadJob?.isActive == true) {
+            modelChoiceMessage = "Wait until the model has loaded."
+            return
+        }
         val app = getApplication<Application>()
+        modelChoiceMessage = null
         launchModelJob {
-            val (found, id) = withContext(Dispatchers.IO) {
-                File(modelPath(app)).exists() to downloader.savedId()
+            // The in-app download is for E2B only, so only another model needs its file now.
+            val found = choice == ModelChoice.E2B ||
+                withContext(Dispatchers.IO) { modelFile(app, choice).exists() }
+            if (!found) {
+                modelChoiceMessage = missingModelText(choice)
+                return@launchModelJob
             }
-            when (modelStart(found, id)) {
-                ModelStart.Load -> {
-                    // A remembered download is not needed any more.
-                    if (id != null) withContext(Dispatchers.IO) { downloader.discard(id) }
-                    loadFromFile()
-                }
-                ModelStart.FollowDownload -> if (id != null) followDownload(id)
-                ModelStart.OfferDownload -> model = ModelState.Missing
+            model = ModelState.Loading
+            withContext(Dispatchers.IO) { saveModelChoice(app, choice) }
+            modelChoice = choice
+            withContext(Dispatchers.Default) { Gemma.close() }
+            startModel()
+        }
+    }
+
+    /**
+     * Loads the chosen model when its file is there, follows a download started earlier, or
+     * offers the download. A chosen E4B whose file has gone falls back to E2B, which is saved.
+     */
+    private suspend fun startModel() {
+        val app = getApplication<Application>()
+        val (saved, usable) = withContext(Dispatchers.IO) {
+            savedModelChoice(app) to usableModelChoice(app)
+        }
+        if (usable != saved) {
+            withContext(Dispatchers.IO) { saveModelChoice(app, usable) }
+            modelChoiceMessage = missingModelText(saved)
+        }
+        modelChoice = usable
+        val (found, id) = withContext(Dispatchers.IO) {
+            File(modelPath(app)).exists() to downloader.savedId()
+        }
+        when (modelStart(found, id)) {
+            ModelStart.Load -> {
+                // A remembered download is not needed any more.
+                if (id != null) withContext(Dispatchers.IO) { downloader.discard(id) }
+                loadFromFile()
             }
+            ModelStart.FollowDownload -> if (id != null) followDownload(id)
+            ModelStart.OfferDownload -> model = ModelState.Missing
         }
     }
 

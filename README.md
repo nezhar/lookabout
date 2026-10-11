@@ -40,9 +40,11 @@ adb push gemma-4-E2B-it.litertlm /data/local/tmp/llm/
 
 The app first looks for `gemma-4-E2B-it.litertlm` in its own files folder, then in `/data/local/tmp/llm/`. Never commit the model file to the repository.
 
+On phones with 12 GB of memory or more, the debug screen also offers the larger Gemma 4 E4B: push `gemma-4-E4B-it.litertlm` (3.66 GB) from <https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm> with the same commands (`adb push gemma-4-E4B-it.litertlm /data/local/tmp/llm/`). The in-app download is E2B only.
+
 ## Debug screens
 
-A long press on the Lookabout title on Setup opens the debug screen, with a model test and the photo check.
+A long press on the Lookabout title on Setup opens the debug screen, with a model test and the photo check. On phones with 12 GB of memory or more (Android reports at least 11 GiB) it also lets you choose between Gemma 4 E2B (the default) and Gemma 4 E4B; the choice is remembered, and if the E4B file is missing the app says so and stays on E2B.
 
 ## Licence
 
