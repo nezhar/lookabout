@@ -67,6 +67,21 @@ class WalkStepsTest {
     }
 
     @Test
+    fun theVerdictPhotoKeepsItsCompactCapAt360By800() {
+        // 800 - 24 status - 24 gesture bar - 8 - 16 padding, and with a 48 dp navigation bar.
+        assertEquals(144f, verdictPhotoMaxHeight(728f), 0.01f)
+        assertEquals(144f, verdictPhotoMaxHeight(704f), 0.01f)
+        assertEquals(144f, verdictPhotoMaxHeight(500f), 0.01f)
+    }
+
+    @Test
+    fun theVerdictPhotoGrowsOnATallerScreen() {
+        // 915 - 24 - 24 - 8 - 16: about the deck's 200 dp at 412 x 915.
+        assertEquals(201.5f, verdictPhotoMaxHeight(843f), 0.01f)
+        assertEquals(154f, verdictPhotoMaxHeight(748f), 0.01f)
+    }
+
+    @Test
     fun aPausedCheckShowsCheckPaused() {
         assertEquals(WalkStep.CheckPaused, walkStep(withPhoto, checking = false, paused = true))
     }

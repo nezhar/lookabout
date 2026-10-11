@@ -119,6 +119,22 @@ fun answersToRecord(result: CheckResult): List<Boolean>? =
 /** The walker's position as shown on screen: index 1 of 5 shots is "2 of 5". */
 fun positionText(index: Int, total: Int): String = "${index + 1} of $total"
 
+/**
+ * Tallest the photo on Accepted and Not yet gets, in dp, on a screen whose content is
+ * [contentHeight] dp high (between the top and bottom padding, inside the system bars). Up to the
+ * 728 dp of 360 x 800 with a 24 dp status bar and a 24 dp gesture bar it is the deck's 144; a
+ * taller screen gives half of its extra height to the photo, so 412 x 915 (843 dp of content)
+ * reaches about 200, as in the deck. The photo still gives up height when the criteria need it.
+ */
+fun verdictPhotoMaxHeight(contentHeight: Float): Float =
+    COMPACT_VERDICT_PHOTO + ((contentHeight - COMPACT_CONTENT_HEIGHT) / 2).coerceAtLeast(0f)
+
+/** The verdict photo's height at 360 x 800 dp (deck page 7). */
+const val COMPACT_VERDICT_PHOTO = 144f
+
+/** The Walk content height at 360 x 800 dp with 24 dp bars and the 8 + 16 dp screen padding. */
+const val COMPACT_CONTENT_HEIGHT = 728f
+
 /** The first of [sizes] (largest first) for which [fits] is true, or the last when none fits. */
 fun <T> largestThatFits(sizes: List<T>, fits: (T) -> Boolean): T {
     require(sizes.isNotEmpty()) { "No sizes to choose from" }
