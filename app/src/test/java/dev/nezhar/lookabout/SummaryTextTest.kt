@@ -47,9 +47,9 @@ class SummaryTextTest {
 
     @Test
     fun agreementReadsAgreedOfChecks() {
-        assertEquals("Gemma and you agreed on 15 of 16 checks", agreementText(15, 16))
-        assertEquals("Gemma and you agreed on 0 of 4 checks", agreementText(0, 4))
-        assertEquals("Gemma and you agreed on 4 of 4 checks", agreementText(4, 4))
+        assertEquals("Gemma and you agreed on 15 of 16 checks.", agreementText(15, 16))
+        assertEquals("Gemma and you agreed on 0 of 4 checks.", agreementText(0, 4))
+        assertEquals("Gemma and you agreed on 4 of 4 checks.", agreementText(4, 4))
     }
 
     @Test

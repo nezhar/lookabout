@@ -47,7 +47,10 @@ fun LookaboutApp(noticeTaps: Int = 0, viewModel: LookaboutViewModel = viewModel(
         val writingCount = viewModel.writingCount
         val endCheckIndex = viewModel.endCheckIndex
         when {
+            // Make my list and New list both write for the topic and sky chosen on Setup.
             screen == Screen.List && writingCount != null -> ListProgress(
+                topic = viewModel.setup.topicText,
+                sky = viewModel.setup.sky.orEmpty(),
                 count = writingCount,
                 modifier = modifier,
             )

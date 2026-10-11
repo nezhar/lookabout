@@ -107,4 +107,10 @@ class SetupTest {
         assertFalse(list.startWalk(1L).checkAtEnd)
         assertTrue(list.startWalk(1L, on.checkAtEnd).checkAtEnd)
     }
+
+    @Test
+    fun listMetaReadsSkyAndCount() {
+        assertEquals("Overcast · 5 pictures", listMetaText("Overcast", 5))
+        assertEquals("Rain · 3 pictures", listMetaText("Rain", 3))
+    }
 }
