@@ -201,4 +201,13 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
         delay(STAND_IN_CHECK_MILLIS)
         return standInAnswers(shotIndex)
     }
+
+    /**
+     * Tap on a criterion on Accepted or Not yet: flips the answer to [questionIndex] (0 to 3) on the
+     * current shot, or restores Gemma's answer if it was already changed. Ignored while a check runs.
+     */
+    fun flip(questionIndex: Int) {
+        if (checking) return
+        updateWalk { it.flip(questionIndex) }
+    }
 }
