@@ -10,16 +10,20 @@ import androidx.lifecycle.viewModelScope
 import dev.nezhar.lookabout.ChallengeList
 import dev.nezhar.lookabout.Gemma
 import dev.nezhar.lookabout.Screen
+import dev.nezhar.lookabout.STAND_IN_CHECK_MILLIS
 import dev.nezhar.lookabout.SetupChoices
 import dev.nezhar.lookabout.backTarget
 import dev.nezhar.lookabout.modelPath
+import dev.nezhar.lookabout.standInAnswers
 import dev.nezhar.lookabout.walk.Walk
 import dev.nezhar.lookabout.walk.pickBuiltInPictures
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 /** Where loading the model stands. */
 sealed interface ModelState {
@@ -124,5 +128,77 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
     /** System Back: List, Summary and Debug return to Setup; a walk ignores it. */
     fun back() {
         screen.backTarget?.let { screen = it }
+    }
+
+    /** True while the current photo is being checked: Walk shows Checking and offers no actions. */
+    var checking by mutableStateOf(false)
+        private set
+
+    /**
+     * Shoot (and Retake): a new photo for the current picture, then its check. Ignored while a
+     * check runs, so a result always belongs to the photo it was made for.
+     *
+     * Stand-in until PW-14: there is no camera yet, so the photo is a path without a file (Walk
+     * shows a plain box for it) and it is taken at once.
+     */
+    fun shoot() {
+        if (checking || walk?.current == null) return
+        val path = File(getApplication<Application>().cacheDir, "stand-in-${System.currentTimeMillis()}.jpg").path
+        updateWalk { it.photoRequested(path) }
+        photoTaken()
+    }
+
+    /** Retake on Not yet: the same as Shoot. */
+    fun retake() = shoot()
+
+    /** The camera wrote the pending photo: it becomes the current shot's photo and is checked. */
+    fun photoTaken() {
+        if (checking || walk?.pendingPhotoPath == null) return
+        updateWalk { it.photoTaken() }
+        checkCurrentPhoto()
+    }
+
+    /** Skip: moves on without an accepted photo; on the last picture it opens Summary. */
+    fun skip() {
+        val current = walk ?: return
+        if (checking || current.current == null) return
+        updateWalk { it.skip() }
+        if (current.isLast) finishWalk()
+    }
+
+    /** Next picture after Accepted; on the last picture this is Finish walk and opens Summary. */
+    fun nextPicture() {
+        val current = walk ?: return
+        if (checking || current.current?.isChecked != true) return
+        updateWalk { it.nextPicture() }
+        if (current.isLast) finishWalk()
+    }
+
+    /** Checks the current shot's photo off the main thread and records the answers through [updateWalk]. */
+    private fun checkCurrentPhoto() {
+        val current = walk ?: return
+        val index = current.currentIndex
+        val shot = current.current ?: return
+        val path = shot.photoPath ?: return
+        checking = true
+        viewModelScope.launch {
+            try {
+                val start = System.nanoTime()
+                val answers = standInCheck(index)
+                val checkMillis = (System.nanoTime() - start) / 1_000_000
+                // Only for the photo it was made for, should the shot have changed meanwhile.
+                updateWalk { w ->
+                    if (w.shots.getOrNull(index)?.photoPath == path) w.recordCheck(answers, checkMillis, index) else w
+                }
+            } finally {
+                checking = false
+            }
+        }
+    }
+
+    /** The stand-in check until PW-14 brings the model: waits two seconds, returns the sample answers. */
+    private suspend fun standInCheck(shotIndex: Int): List<Boolean> {
+        delay(STAND_IN_CHECK_MILLIS)
+        return standInAnswers(shotIndex)
     }
 }

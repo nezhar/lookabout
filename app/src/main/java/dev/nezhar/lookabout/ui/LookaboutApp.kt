@@ -35,7 +35,11 @@ fun LookaboutApp(viewModel: LookaboutViewModel = viewModel()) {
             )
             screen == Screen.Walk && walk != null -> WalkScreen(
                 walk = walk,
-                onWalkChange = { updated -> viewModel.updateWalk { updated } },
+                checking = viewModel.checking,
+                onShoot = viewModel::shoot,
+                onSkip = viewModel::skip,
+                onRetake = viewModel::retake,
+                onNextPicture = viewModel::nextPicture,
                 onFinish = viewModel::finishWalk,
                 modifier = modifier,
             )
