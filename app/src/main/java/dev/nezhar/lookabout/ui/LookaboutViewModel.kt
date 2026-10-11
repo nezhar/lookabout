@@ -24,6 +24,7 @@ import dev.nezhar.lookabout.WalkStore
 import dev.nezhar.lookabout.answersToRecord
 import dev.nezhar.lookabout.backTarget
 import dev.nezhar.lookabout.checkPhoto
+import dev.nezhar.lookabout.checksAtEnd
 import dev.nezhar.lookabout.copyToGallery
 import dev.nezhar.lookabout.downloadStep
 import dev.nezhar.lookabout.listPrompt
@@ -293,7 +294,7 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
     /** Start walk: a new walk from the list, shown on Walk. */
     fun startWalk() {
         val current = list ?: return
-        walk = current.startWalk(System.currentTimeMillis())
+        walk = current.startWalk(System.currentTimeMillis(), setup.checkAtEnd)
         onSummary = false
         saveWalk()
         screen = Screen.Walk
@@ -308,8 +309,21 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
         return updated != current
     }
 
-    /** Finish walk (or Skip on the last picture): shows Summary. */
+    /**
+     * Finish walk (or Skip on the last picture): shows Summary. When the photos are checked at the
+     * end, the check at the end runs first and opens Summary when it is done.
+     */
     fun finishWalk() {
+        val current = walk ?: return
+        if (checksAtEnd(current, onSummary) && current.shotsToCheck.isNotEmpty()) {
+            checkAllAtEnd()
+            return
+        }
+        showSummary()
+    }
+
+    /** Shows Summary for the walk, without checking anything. */
+    private fun showSummary() {
         if (walk == null) return
         onSummary = true
         saveWalk()
@@ -333,7 +347,8 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
      * Loads the saved walk, if any, and opens where the walker left off: Summary when they had
      * moved on to it, else Walk, whose screens follow from the current shot. A photo the camera
      * wrote while the app was closed is checked; an empty or missing one is dropped. A photo
-     * whose check had not come in is checked again.
+     * whose check had not come in is checked again. When the photos are checked at the end, a
+     * photo is only checked there: a walk past its last picture resumes the check at the end.
      */
     private fun restoreWalk() {
         val saved = walkStore.load() ?: return
@@ -352,7 +367,9 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
                     cameraCancelled()
                 }
             }
-            !saved.onSummary && shot != null && shot.hasPhoto && !shot.isChecked -> checkCurrentPhoto()
+            checksAtEnd(saved.walk, saved.onSummary) -> finishWalk()
+            !saved.walk.checkAtEnd && !saved.onSummary && shot != null && shot.hasPhoto && !shot.isChecked ->
+                checkCurrentPhoto()
         }
     }
 
@@ -411,7 +428,10 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
         updateWalk { it.cameraCancelled() }
     }
 
-    /** The camera wrote [file]: it becomes the current shot's photo, replacing an older one, and is checked. */
+    /**
+     * The camera wrote [file]: it becomes the current shot's photo, replacing an older one, and is
+     * checked, unless the walk checks its photos at the end.
+     */
     fun photoTaken(file: File) {
         if (!canTakePhoto) return
         // Already the current photo: the saved walk was restored and checked it before the camera result came in.
@@ -422,7 +442,7 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
             pending.photoTaken()
         }
         viewModelScope.launch(Dispatchers.IO) { copyToGallery(getApplication<Application>(), file) }
-        checkCurrentPhoto()
+        if (!current.checkAtEnd) checkCurrentPhoto()
     }
 
     /** Try again on Check paused: checks the same photo again. */
@@ -440,10 +460,13 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
         if (current.isLast) finishWalk()
     }
 
-    /** Next picture after Accepted; on the last picture this is Finish walk and opens Summary. */
+    /**
+     * Next picture after Accepted, or after Photo taken when the photos are checked at the end; on
+     * the last picture this is Finish walk.
+     */
     fun nextPicture() {
         val current = walk ?: return
-        if (checking || current.current?.isChecked != true) return
+        if (checking || !current.canMoveOn) return
         updateWalk { it.nextPicture() }
         if (current.isLast) finishWalk()
     }
@@ -475,6 +498,47 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             } finally {
                 checking = false
+            }
+        }
+    }
+
+    /**
+     * The shot whose photo the check at the end is checking, null while it does not run. Walk shows
+     * Checking with the photo's position then, and keeps the screen on.
+     */
+    var endCheckIndex by mutableStateOf<Int?>(null)
+        private set
+
+    private var endCheckJob: Job? = null
+
+    /**
+     * The check at the end: checks every photo without a check, one after another, with the same
+     * check as during a walk, and records each result through [updateWalk] (so it is saved) if
+     * the shot still holds that photo. A failed check leaves its shot unchecked and moves on.
+     * Then Summary opens. There is no buzz per result: the walker is watching the screen, and a
+     * run of buzzes would only blur the verdicts, which Summary lists together.
+     */
+    private fun checkAllAtEnd() {
+        if (endCheckJob?.isActive == true) return
+        val queue = walk?.shotsToCheck ?: return
+        val app = getApplication<Application>()
+        endCheckIndex = queue.firstOrNull()
+        endCheckJob = viewModelScope.launch {
+            try {
+                for (index in queue) {
+                    val shot = walk?.shots?.getOrNull(index) ?: continue
+                    val path = shot.photoPath ?: continue
+                    if (shot.isChecked) continue
+                    endCheckIndex = index
+                    val result = checkPhoto(app, Uri.fromFile(File(path)), shot.questions)
+                    val answers = answersToRecord(result) ?: continue
+                    updateWalk { w ->
+                        if (w.shots.getOrNull(index)?.photoPath == path) w.recordCheck(answers, result.modelMs, index) else w
+                    }
+                }
+                showSummary()
+            } finally {
+                endCheckIndex = null
             }
         }
     }
