@@ -30,6 +30,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.nezhar.lookabout.acceptedTotalText
+import dev.nezhar.lookabout.agreementText
 import dev.nezhar.lookabout.checkTimeText
 import dev.nezhar.lookabout.coverageText
 import dev.nezhar.lookabout.ui.theme.Accepted
@@ -46,8 +47,9 @@ import java.io.File
 private val PhotoSize = 72.dp
 
 /**
- * Summary: the topic, the date the walk started, the total and one row per picture with its
- * photo, text, coverage, check time and badge. The rows scroll under the pinned New walk button.
+ * Summary: the topic, the date the walk started, the total, how often the walker and Gemma agreed
+ * (only when a photo was checked) and one row per picture with its photo, text, coverage, check
+ * time and badge. The rows scroll under the pinned New walk button.
  *
  * @param onNewWalk returns to Setup.
  */
@@ -78,6 +80,13 @@ fun SummaryScreen(
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(top = 8.dp),
                     )
+                    agreementText(walk.agreedCount, walk.checkCount)?.let { agreement ->
+                        Text(
+                            agreement,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
             items(walk.shots) { shot ->
@@ -230,5 +239,16 @@ private fun SummaryPreview() {
 private fun SummarySixPreview() {
     LookaboutTheme {
         SummaryScreen(walk = previewWalk(6), onNewWalk = {})
+    }
+}
+
+/** Every picture skipped: no photo was checked, so the agreement line is hidden. */
+@Preview(showBackground = true, widthDp = 360, heightDp = 800)
+@Composable
+private fun SummaryNothingCheckedPreview() {
+    val walk = Walk.start("Autumn colour", "Some cloud", builtInPictures.take(3), 1_791_700_000_000L)
+        .skip().skip().skip()
+    LookaboutTheme {
+        SummaryScreen(walk = walk, onNewWalk = {})
     }
 }

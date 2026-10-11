@@ -29,3 +29,11 @@ fun coverageText(percent: Int): String = "$percent%"
 
 /** The total such as "3 of 5 accepted". */
 fun acceptedTotalText(accepted: Int, total: Int): String = "$accepted of $total accepted"
+
+/**
+ * How often the walker kept Gemma's answer, such as "Gemma and you agreed on 15 of 16 checks".
+ * [checks] counts only checked photos (four per photo); null when no photo was checked, so the
+ * line is hidden.
+ */
+fun agreementText(agreed: Int, checks: Int): String? =
+    if (checks <= 0) null else "Gemma and you agreed on $agreed of $checks checks"
