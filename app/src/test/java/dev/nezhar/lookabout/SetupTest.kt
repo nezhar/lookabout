@@ -72,10 +72,16 @@ class SetupTest {
     }
 
     @Test
-    fun backReturnsToSetupFromListSummaryAndDebug() {
+    fun backReturnsToSetupFromListSummaryDebugAndPastWalks() {
         assertEquals(Screen.Setup, Screen.List.backTarget)
         assertEquals(Screen.Setup, Screen.Summary.backTarget)
         assertEquals(Screen.Setup, Screen.Debug.backTarget)
+        assertEquals(Screen.Setup, Screen.PastWalks.backTarget)
+    }
+
+    @Test
+    fun backFromAPastWalkReturnsToPastWalks() {
+        assertEquals(Screen.PastWalks, Screen.PastSummary.backTarget)
     }
 
     @Test

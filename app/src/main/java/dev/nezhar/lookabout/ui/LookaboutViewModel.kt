@@ -2,6 +2,7 @@ package dev.nezhar.lookabout.ui
 
 import android.app.Application
 import android.net.Uri
+import android.os.Environment
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,9 +48,11 @@ import dev.nezhar.lookabout.timeOfDay
 import dev.nezhar.lookabout.usableModelChoice
 import dev.nezhar.lookabout.waitsForPhoto
 import dev.nezhar.lookabout.walkNotice
+import dev.nezhar.lookabout.walk.ArchivedWalkSummary
 import dev.nezhar.lookabout.walk.SavedWalk
 import dev.nezhar.lookabout.walk.WALK_ARCHIVE_DIR
 import dev.nezhar.lookabout.walk.Walk
+import dev.nezhar.lookabout.walk.archiveId
 import dev.nezhar.lookabout.walk.isAccepted
 import dev.nezhar.lookabout.writeList
 import kotlinx.coroutines.CancellationException
@@ -57,6 +60,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -120,7 +124,7 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
     private val walkStore = WalkStore(File(application.filesDir, WALK_FILE_NAME))
 
     /** Every walk that reached Summary, with its results. */
-    val archivedWalks = ArchivedWalks(File(application.filesDir, WALK_ARCHIVE_DIR))
+    val archivedWalks = ArchivedWalks.at(File(application.filesDir, WALK_ARCHIVE_DIR))
 
     private val downloader = ModelDownloader(application)
 
@@ -470,9 +474,10 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /**
-     * System Back: List, Summary and Debug return to Setup; a walk ignores it. Leaving List stops
-     * the list being written; leaving Summary is New walk, so the finished walk is not reopened.
-     * While Check again runs from Summary, Back stops it and Summary shows again.
+     * System Back: List, Summary, Debug and Past walks return to Setup; a walk ignores it. Leaving
+     * List stops the list being written; leaving Summary is New walk, so the finished walk is not
+     * reopened. While Check again runs from Summary, Back stops it and Summary shows again. A past
+     * walk's Summary returns to Past walks.
      */
     fun back() {
         val target = screen.backTarget ?: return
@@ -480,6 +485,10 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
             Screen.List -> stopWriting()
             Screen.Summary -> {
                 if (endCheckJob?.isActive == true) endCheckJob?.cancel() else newWalk()
+                return
+            }
+            Screen.PastSummary -> {
+                closePastWalk()
                 return
             }
             else -> {}
@@ -721,6 +730,107 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
     init {
         viewModelScope.launch(Dispatchers.Main) {
             snapshotFlow { walkNotice(walk, screen) }.collect { walkNotifier.show(it) }
+        }
+    }
+
+    /**
+     * The archived walks, newest first, for Past walks and for Setup, which offers Past walks when
+     * there is one. Null until the archive has been read; read again whenever Setup or Past walks
+     * shows. An unreadable archive reads as empty.
+     */
+    var pastWalks by mutableStateOf<List<ArchivedWalkSummary>?>(null)
+        private set
+
+    /** The archived walk shown read-only on [Screen.PastSummary], null on every other screen. */
+    var pastWalk by mutableStateOf<Walk?>(null)
+        private set
+
+    /** Past walks on Setup. */
+    fun showPastWalks() {
+        if (screen != Screen.Setup) return
+        screen = Screen.PastWalks
+    }
+
+    /**
+     * A tap on a row on Past walks: loads that walk off the main thread and shows it read-only on
+     * Summary. A walk that can no longer be read is dropped from the list instead.
+     */
+    fun openPastWalk(id: Long) {
+        if (screen != Screen.PastWalks) return
+        viewModelScope.launch {
+            val loaded = try {
+                archivedWalks.load(id)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (t: Throwable) {
+                Log.w(Gemma.TAG, "Could not read the archived walk", t)
+                null
+            }
+            if (screen != Screen.PastWalks) return@launch
+            if (loaded == null) {
+                readPastWalks()
+            } else {
+                pastWalk = loaded
+                screen = Screen.PastSummary
+            }
+        }
+    }
+
+    /** Back on a past walk's Summary: Past walks again. */
+    fun closePastWalk() {
+        if (screen != Screen.PastSummary) return
+        pastWalk = null
+        screen = Screen.PastWalks
+    }
+
+    /**
+     * Delete on Past walks: removes the archived walk with [id] and the app's own copies of its
+     * photos (the files in the app's Pictures folder); copies in the gallery stay. When it is
+     * still the current walk (on Summary, or saved to reopen there), that walk is dropped too, so
+     * no later save brings it back.
+     */
+    fun deletePastWalk(id: Long) {
+        if (screen != Screen.PastWalks) return
+        val current = walk
+        if (current != null && archiveId(current) == id) {
+            endCheckJob?.cancel()
+            walk = null
+            onSummary = false
+            saveWalk()
+        }
+        pastWalks = pastWalks?.filterNot { it.id == id }
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            try {
+                val photoDir = withContext(Dispatchers.IO) { app.getExternalFilesDir(Environment.DIRECTORY_PICTURES) }
+                if (!archivedWalks.deleteWithPhotos(id, photoDir)) Log.w(Gemma.TAG, "Could not delete the archived walk $id")
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (t: Throwable) {
+                Log.w(Gemma.TAG, "Could not delete the archived walk $id", t)
+            }
+            readPastWalks()
+        }
+    }
+
+    private suspend fun readPastWalks() {
+        pastWalks = try {
+            archivedWalks.list()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (t: Throwable) {
+            Log.w(Gemma.TAG, "Could not read the walk archive", t)
+            emptyList()
+        }
+    }
+
+    // Setup and Past walks read the archive each time they show, so a walk archived or deleted
+    // meanwhile is counted.
+    init {
+        viewModelScope.launch {
+            snapshotFlow { screen }.collectLatest { shown ->
+                if (shown == Screen.Setup || shown == Screen.PastWalks) readPastWalks()
+            }
         }
     }
 
