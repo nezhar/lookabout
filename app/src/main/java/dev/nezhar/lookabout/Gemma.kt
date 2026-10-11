@@ -9,6 +9,8 @@ import com.google.ai.edge.litertlm.Contents
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
+import com.google.ai.edge.litertlm.ExperimentalApi
+import com.google.ai.edge.litertlm.ExperimentalFlags
 import com.google.ai.edge.litertlm.SamplerConfig
 import com.google.ai.edge.litertlm.ThinkingConfig
 import java.io.File
@@ -30,23 +32,44 @@ object Gemma {
     var backendName: String? = null
         private set
 
+    /** Whether speculative decoding (multi-token prediction) is on, once the model is loaded. */
+    @Volatile
+    var speculativeDecoding: Boolean = false
+        private set
+
     /**
-     * Loads the model once; later calls return at once. Tries the GPU first and falls back to
-     * the CPU for both the main and the vision backend.
+     * Loads the model once; later calls return at once. Tries the GPU with speculative decoding
+     * first, then the GPU without it, then the CPU without it, for both the main and the vision
+     * backend. Speculative decoding needs the MTP drafter in the model file.
      */
     @Synchronized
     fun load(modelPath: String, cacheDir: String) {
         checkNotMainThread()
         if (engine != null) return
         engine = try {
-            start(modelPath, cacheDir, Backend.GPU())
-        } catch (t: Throwable) {
-            Log.w(TAG, "The GPU backend did not start, trying the CPU", t)
-            start(modelPath, cacheDir, Backend.CPU())
+            start(modelPath, cacheDir, Backend.GPU(), speculative = true)
+        } catch (withMtp: Throwable) {
+            Log.w(
+                TAG,
+                "The GPU backend did not start with speculative decoding, trying without",
+                withMtp,
+            )
+            try {
+                start(modelPath, cacheDir, Backend.GPU(), speculative = false)
+            } catch (gpu: Throwable) {
+                Log.w(TAG, "The GPU backend did not start, trying the CPU", gpu)
+                start(modelPath, cacheDir, Backend.CPU(), speculative = false)
+            }
         }
     }
 
-    private fun start(modelPath: String, cacheDir: String, backend: Backend): Engine {
+    @OptIn(ExperimentalApi::class)
+    private fun start(
+        modelPath: String,
+        cacheDir: String,
+        backend: Backend,
+        speculative: Boolean,
+    ): Engine {
         val candidate = Engine(
             EngineConfig(
                 modelPath = modelPath,
@@ -55,9 +78,17 @@ object Gemma {
                 cacheDir = cacheDir,
             )
         )
-        // A failed initialize() leaves no native engine behind, so there is nothing to close.
-        candidate.initialize()
+        // initialize() reads this global flag. True makes it fail if the model has no MTP
+        // drafter; null leaves the native setting unset, which in 0.17.1 means off.
+        ExperimentalFlags.enableSpeculativeDecoding = if (speculative) true else null
+        try {
+            // A failed initialize() leaves no native engine behind, so there is nothing to close.
+            candidate.initialize()
+        } finally {
+            ExperimentalFlags.enableSpeculativeDecoding = null
+        }
         backendName = backend.name
+        speculativeDecoding = speculative
         return candidate
     }
 

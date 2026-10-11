@@ -37,6 +37,7 @@ sealed interface ModelTestState {
     data object Running : ModelTestState
     data class Done(
         val backend: String,
+        val speculativeDecoding: Boolean,
         val loadMs: Long,
         val reply: String,
         val answerMs: Long,
@@ -45,8 +46,8 @@ sealed interface ModelTestState {
 }
 
 /**
- * Model test: loads Gemma, asks for READY and shows the backend, the load time, the reply and
- * the answer time. Self-contained, so any screen can show it.
+ * Model test: loads Gemma, asks for READY and shows the backend, whether speculative decoding is
+ * on, the load time, the reply and the answer time. Self-contained, so any screen can show it.
  */
 @Composable
 fun ModelTest(modifier: Modifier = Modifier) {
@@ -84,13 +85,16 @@ private fun runModelTest(modelPath: String, cacheDir: String): ModelTestState.Do
     val reply = Gemma.ask(READY_PROMPT).trim()
     val answered = SystemClock.elapsedRealtime()
     val backend = Gemma.backendName ?: "unknown"
+    val speculative = Gemma.speculativeDecoding
     Log.i(
         Gemma.TAG,
-        "Model test: $backend, loaded in ${loaded - start} ms, " +
-            "replied \"$reply\" in ${answered - loaded} ms",
+        "Model test: $backend, speculative decoding ${onOff(speculative)}, " +
+            "loaded in ${loaded - start} ms, replied \"$reply\" in ${answered - loaded} ms",
     )
-    return ModelTestState.Done(backend, loaded - start, reply, answered - loaded)
+    return ModelTestState.Done(backend, speculative, loaded - start, reply, answered - loaded)
 }
+
+private fun onOff(on: Boolean): String = if (on) "on" else "off"
 
 @Composable
 fun ModelTestContent(
@@ -113,6 +117,7 @@ fun ModelTestContent(
             }
             is ModelTestState.Done -> Text(
                 "Backend: ${state.backend}\n" +
+                    "Speculative decoding: ${onOff(state.speculativeDecoding)}\n" +
                     "Load time: ${state.loadMs} ms\n" +
                     "Reply: \"${state.reply}\"\n" +
                     "Answer time: ${state.answerMs} ms"
@@ -130,7 +135,13 @@ fun ModelTestContent(
 private fun ModelTestDonePreview() {
     LookaboutTheme {
         ModelTestContent(
-            state = ModelTestState.Done(backend = "GPU", loadMs = 9412, reply = "READY", answerMs = 380),
+            state = ModelTestState.Done(
+                backend = "GPU",
+                speculativeDecoding = true,
+                loadMs = 9412,
+                reply = "READY",
+                answerMs = 380,
+            ),
             onRun = {},
         )
     }
