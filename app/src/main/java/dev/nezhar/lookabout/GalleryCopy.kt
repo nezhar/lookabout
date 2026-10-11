@@ -34,7 +34,9 @@ fun copyToGallery(context: Context, file: File): Uri? {
             ?: throw IOException("Could not open $entry for writing")
         output.use { out -> file.inputStream().use { it.copyTo(out) } }
         val done = ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }
-        resolver.update(entry, done, null, null)
+        if (resolver.update(entry, done, null, null) == 0) {
+            throw IOException("Could not publish $entry in the gallery")
+        }
         entry
     } catch (t: Throwable) {
         Log.w(Gemma.TAG, "Could not copy the photo to the gallery", t)

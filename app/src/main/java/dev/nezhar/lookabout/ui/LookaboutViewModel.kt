@@ -66,8 +66,11 @@ sealed interface ModelState {
     /** No model file and no download: Setup offers the download. */
     data object Missing : ModelState
 
-    /** The model downloads; [percent] is null while unknown, [waiting] while it waits for Wi-Fi. */
-    data class Downloading(val percent: Int?, val waiting: Boolean) : ModelState
+    /**
+     * The model downloads; [percent] is null while unknown, [pausedReason] is the system's reason
+     * code while the download is paused and null while it runs.
+     */
+    data class Downloading(val percent: Int?, val pausedReason: Int?) : ModelState
 
     /** The download failed or was stopped: Setup shows [message] and Try again. */
     data class DownloadFailed(val message: String) : ModelState
@@ -199,7 +202,7 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
     fun downloadModel() {
         if (loadJob?.isActive == true) return
         if (model != ModelState.Missing && model !is ModelState.DownloadFailed) return
-        model = ModelState.Downloading(percent = null, waiting = false)
+        model = ModelState.Downloading(percent = null, pausedReason = null)
         launchModelJob {
             val id = try {
                 withContext(Dispatchers.IO) { downloader.start() }
@@ -264,7 +267,7 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
         while (true) {
             val snapshot = withContext(Dispatchers.IO) { downloader.query(id) }
             when (val step = downloadStep(snapshot)) {
-                is DownloadStep.Running -> model = ModelState.Downloading(step.percent, step.waiting)
+                is DownloadStep.Running -> model = ModelState.Downloading(step.percent, step.pausedReason)
                 DownloadStep.Finished -> {
                     model = ModelState.Loading
                     val moved = try {

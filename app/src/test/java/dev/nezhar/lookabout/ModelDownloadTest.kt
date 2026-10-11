@@ -54,28 +54,42 @@ class ModelDownloadTest {
 
     @Test
     fun progressText() {
-        assertEquals("Downloading the model: 42%", downloadProgressText(42, waiting = false))
-        assertEquals("Downloading the model", downloadProgressText(null, waiting = false))
-        assertEquals("Waiting for Wi-Fi (42%)", downloadProgressText(42, waiting = true))
-        assertEquals("Waiting for Wi-Fi", downloadProgressText(null, waiting = true))
+        assertEquals("Downloading the model: 42%", downloadProgressText(42, pausedReason = null))
+        assertEquals("Downloading the model", downloadProgressText(null, pausedReason = null))
+    }
+
+    @Test
+    fun pausedForANetworkWaitsForWifi() {
+        // DownloadManager.PAUSED_QUEUED_FOR_WIFI = 3, PAUSED_WAITING_FOR_NETWORK = 2.
+        assertEquals("Waiting for Wi-Fi (42%)", downloadProgressText(42, pausedReason = 3))
+        assertEquals("Waiting for Wi-Fi", downloadProgressText(null, pausedReason = 3))
+        assertEquals("Waiting for Wi-Fi (42%)", downloadProgressText(42, pausedReason = 2))
+    }
+
+    @Test
+    fun pausedForAnyOtherReasonWillRetry() {
+        // DownloadManager.PAUSED_WAITING_TO_RETRY = 1, PAUSED_UNKNOWN = 4.
+        assertEquals("Paused, will retry (42%)", downloadProgressText(42, pausedReason = 1))
+        assertEquals("Paused, will retry", downloadProgressText(null, pausedReason = 4))
+        assertEquals("Paused, will retry", downloadProgressText(null, pausedReason = 0))
     }
 
     @Test
     fun runningAndPendingDownloadsShowProgress() {
         assertEquals(
-            DownloadStep.Running(50, waiting = false),
+            DownloadStep.Running(50, pausedReason = null),
             downloadStep(DownloadSnapshot(DownloadPhase.Running, 50, 100)),
         )
         assertEquals(
-            DownloadStep.Running(null, waiting = false),
+            DownloadStep.Running(null, pausedReason = null),
             downloadStep(DownloadSnapshot(DownloadPhase.Pending, 0, -1)),
         )
     }
 
     @Test
-    fun pausedDownloadWaits() {
+    fun pausedDownloadKeepsItsReason() {
         assertEquals(
-            DownloadStep.Running(10, waiting = true),
+            DownloadStep.Running(10, pausedReason = 3),
             downloadStep(DownloadSnapshot(DownloadPhase.Paused, 10, 100, reason = 3)),
         )
     }

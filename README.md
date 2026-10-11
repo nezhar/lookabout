@@ -6,14 +6,27 @@ An entry for the Hacktoberfest Open-Source AI Challenge, Week 1: Touch Grass.
 
 ## How it works
 
-1. **Setup**: pick the number of pictures, a topic and what the sky is doing. On first start, Setup offers to download the model (2.6 GB, Wi-Fi only, once); the progress shows there and the download can be cancelled.
-2. **List**: Gemma writes the pictures to find from the topic, the sky, the time of day and the month, each with four yes/no questions. Any gap is filled from a built-in list, which is also used alone when the model is not loaded. All pictures are shown up front. Ask for a new list or start the walk.
-3. **Walk**: one picture at a time. Take a photo with the camera app, and Gemma answers the four questions about it. Two or more YES answers and the photo is accepted; otherwise retake it or skip. The phone buzzes with the verdict: one long pulse for Accepted, two short ones for Not yet. Tap a question to change Gemma's answer if it got it wrong (tap again to restore it); the verdict follows.
+1. **Setup**: pick the number of pictures, a topic and what the sky is doing. On first start, Setup offers to download the model (2.6 GB, Wi-Fi only, once); the progress shows there and the download can be cancelled. Under the sky choice, **Use my location for the light** asks once for your rough location. Setup also has a **Check photos at the end** switch (see below).
+2. **List**: Gemma writes the pictures to find from the topic, the sky, the time of day and the month, each with four yes/no questions. If you allowed location, the prompt also gets a line saying where the sun is, such as "low in the south-west", worked out on the phone from the last known coarse location; the location is not stored. Any gap is filled from a built-in list, which is also used alone when the model is not loaded. All pictures are shown up front. Ask for a new list or start the walk.
+3. **Walk**: one picture at a time. Take a photo with the camera app, and Gemma answers the four questions about it. Two or more YES answers and the photo is accepted; otherwise retake it or skip. The phone buzzes with the verdict: one long pulse for Accepted, two short ones for Not yet. Tap a question to change Gemma's answer if it got it wrong (tap again to restore it); the verdict follows. Each photo is also copied to the phone's gallery, in `Pictures/Lookabout`, so you can edit and share it from there.
 4. **Summary**: the topic, the date and how many pictures were accepted, then each picture with its photo, its coverage (the share of YES answers) and how long the check took. A line says how often you and Gemma agreed, counting the answers you left unchanged.
+
+With **Check photos at the end** on, the walk does not wait for Gemma: take a photo, go to the next picture, and at **Finish walk** every photo is checked one after another ("Checking 2 of 5"). A photo whose check fails shows **Not checked** on Summary.
+
+During a walk, a silent notice, also shown on the lock screen, shows the current picture and its position, such as "2 of 5". Tapping it opens the walk, and the camera when the picture still needs its photo. Start walk asks once for permission to post notifications (Android 13 and later); without it there is no notice.
 
 The walk is saved on the phone after every change, so it survives Android closing the app while the camera is open: the app opens where you left off and checks a photo taken in the meantime.
 
-Everything runs on the phone. The app has the INTERNET permission only to download the model once; the lists and the photo checks never leave the phone.
+Everything runs on the phone. Downloading the model is the only time the app goes online; the lists, the photos and the photo checks never leave the phone.
+
+## Permissions
+
+- **Internet** (`INTERNET`): to download the model, once, over Wi-Fi.
+- **Vibration** (`VIBRATE`): to buzz the verdict when a photo is checked during the walk.
+- **Approximate location** (`ACCESS_COARSE_LOCATION`, optional, asked from Setup): to work out where the sun is for the list. Without it the list is written without the sun line.
+- **Notifications** (`POST_NOTIFICATIONS`, optional, asked once at Start walk on Android 13 and later): for the lock-screen notice during a walk.
+
+The camera app takes the photos, so Lookabout needs no camera permission, and copying photos to `Pictures/Lookabout` needs no storage permission.
 
 ## Build
 
@@ -44,7 +57,7 @@ On phones with 12 GB of memory or more, the debug screen also offers the larger 
 
 ## Debug screens
 
-A long press on the Lookabout title on Setup opens the debug screen, with a model test and the photo check. On phones with 12 GB of memory or more (Android reports at least 11 GiB) it also lets you choose between Gemma 4 E2B (the default) and Gemma 4 E4B; the choice is remembered, and if the E4B file is missing the app says so and stays on E2B.
+A long press on the Lookabout title on Setup opens the debug screen, with a model test and the photo check. The model loads on the GPU with speculative decoding (multi-token prediction) when it can, else on the GPU without it, else on the CPU; the model test shows the backend and whether speculative decoding is on. On phones with 12 GB of memory or more (Android reports at least 11 GiB) it also lets you choose between Gemma 4 E2B (the default) and Gemma 4 E4B; the choice is remembered, and if the E4B file is missing the app says so and stays on E2B.
 
 ## Licence
 

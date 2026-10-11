@@ -1,5 +1,6 @@
 package dev.nezhar.lookabout
 
+import dev.nezhar.lookabout.walk.Outcome
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.Locale
@@ -54,5 +55,22 @@ class SummaryTextTest {
     @Test
     fun agreementIsHiddenWithoutCheckedPhotos() {
         assertNull(agreementText(0, 0))
+    }
+
+    @Test
+    fun badgeNamesTheOutcome() {
+        assertEquals("Accepted", badgeText(Outcome.ACCEPTED, hasPhoto = true))
+        assertEquals("Not yet", badgeText(Outcome.NOT_YET, hasPhoto = true))
+        assertEquals("Skipped", badgeText(Outcome.SKIPPED, hasPhoto = false))
+    }
+
+    @Test
+    fun photoWhoseCheckNeverCameInIsNotChecked() {
+        assertEquals("Not checked", badgeText(Outcome.PENDING, hasPhoto = true))
+    }
+
+    @Test
+    fun pendingShotWithoutAPhotoReadsSkipped() {
+        assertEquals("Skipped", badgeText(Outcome.PENDING, hasPhoto = false))
     }
 }
