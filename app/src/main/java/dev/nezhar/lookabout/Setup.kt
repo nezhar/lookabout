@@ -98,3 +98,6 @@ data class ChallengeList(
     fun startWalk(startedAtMillis: Long, checkAtEnd: Boolean = false): Walk =
         Walk.start(topic, sky, pictures, startedAtMillis, checkAtEnd)
 }
+
+/** The line under the topic on List, such as "Overcast · 5 pictures". */
+fun listMetaText(sky: String, count: Int): String = "$sky · $count pictures"
