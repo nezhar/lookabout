@@ -55,8 +55,11 @@ data class DownloadSnapshot(
 
 /** What to do after a look at the download. */
 sealed interface DownloadStep {
-    /** Still going: show [percent] (null while unknown); [waiting] when it waits for Wi-Fi. */
-    data class Running(val percent: Int?, val waiting: Boolean) : DownloadStep
+    /**
+     * Still going: show [percent] (null while unknown). [pausedReason] is the system's reason code
+     * while the download is paused, null while it runs.
+     */
+    data class Running(val percent: Int?, val pausedReason: Int?) : DownloadStep
 
     /** The whole file is there: move it into place and load it. */
     data object Finished : DownloadStep
@@ -70,8 +73,8 @@ fun downloadStep(snapshot: DownloadSnapshot?): DownloadStep {
     if (snapshot == null) return DownloadStep.Failed("The download was stopped.")
     val percent = downloadPercent(snapshot.downloadedBytes, snapshot.totalBytes)
     return when (snapshot.phase) {
-        DownloadPhase.Pending, DownloadPhase.Running -> DownloadStep.Running(percent, waiting = false)
-        DownloadPhase.Paused -> DownloadStep.Running(percent, waiting = true)
+        DownloadPhase.Pending, DownloadPhase.Running -> DownloadStep.Running(percent, pausedReason = null)
+        DownloadPhase.Paused -> DownloadStep.Running(percent, pausedReason = snapshot.reason)
         DownloadPhase.Successful -> DownloadStep.Finished
         DownloadPhase.Failed -> DownloadStep.Failed(downloadFailureText(snapshot.reason))
     }
@@ -83,12 +86,22 @@ fun downloadPercent(downloadedBytes: Long, totalBytes: Long): Int? {
     return (downloadedBytes.coerceIn(0, totalBytes) * 100 / totalBytes).toInt()
 }
 
-/** The line Setup shows while the model downloads. */
-fun downloadProgressText(percent: Int?, waiting: Boolean): String = when {
-    waiting && percent != null -> "Waiting for Wi-Fi ($percent%)"
-    waiting -> "Waiting for Wi-Fi"
-    percent != null -> "Downloading the model: $percent%"
-    else -> "Downloading the model"
+// DownloadManager's reason codes for a paused download that waits for a network.
+private const val PAUSED_WAITING_FOR_NETWORK = 2
+private const val PAUSED_QUEUED_FOR_WIFI = 3
+
+/**
+ * The line Setup shows while the model downloads. [pausedReason] is the system's reason code while
+ * the download is paused, null while it runs: a download that waits for a network says it waits
+ * for Wi-Fi (the download is Wi-Fi only), any other pause says it will retry.
+ */
+fun downloadProgressText(percent: Int?, pausedReason: Int?): String {
+    val status = when (pausedReason) {
+        null -> return if (percent != null) "Downloading the model: $percent%" else "Downloading the model"
+        PAUSED_WAITING_FOR_NETWORK, PAUSED_QUEUED_FOR_WIFI -> "Waiting for Wi-Fi"
+        else -> "Paused, will retry"
+    }
+    return if (percent != null) "$status ($percent%)" else status
 }
 
 // DownloadManager's reason codes for a failed download.

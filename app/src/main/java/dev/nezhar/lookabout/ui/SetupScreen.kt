@@ -189,7 +189,7 @@ fun SetupScreen(
                 }
                 is ModelState.Downloading -> {
                     Text(
-                        downloadProgressText(model.percent, model.waiting),
+                        downloadProgressText(model.percent, model.pausedReason),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     val percent = model.percent
@@ -312,7 +312,7 @@ private fun SetupDownloadingPreview() {
     LookaboutTheme {
         SetupScreen(
             choices = SetupChoices(sky = "Clear"),
-            model = ModelState.Downloading(percent = 42, waiting = false),
+            model = ModelState.Downloading(percent = 42, pausedReason = null),
             onChoicesChange = {},
             onMakeList = {},
             onTryAgain = {},
