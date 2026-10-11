@@ -87,6 +87,8 @@ fun LookaboutApp(noticeTaps: Int = 0, viewModel: LookaboutViewModel = viewModel(
                 onChoicesChange = viewModel::updateSetup,
                 onMakeList = viewModel::makeList,
                 onTryAgain = viewModel::loadModel,
+                onDownload = viewModel::downloadModel,
+                onCancelDownload = viewModel::cancelDownload,
                 onOpenDebug = viewModel::openDebug,
                 modifier = modifier,
             )

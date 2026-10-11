@@ -13,7 +13,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -27,15 +29,18 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.nezhar.lookabout.MAX_OWN_TOPIC_CHARS
+import dev.nezhar.lookabout.MODEL_SIZE_TEXT
 import dev.nezhar.lookabout.PICTURE_COUNTS
 import dev.nezhar.lookabout.SKY_OPTIONS
 import dev.nezhar.lookabout.SUGGESTED_TOPICS
 import dev.nezhar.lookabout.SetupChoices
+import dev.nezhar.lookabout.downloadProgressText
 import dev.nezhar.lookabout.ui.theme.LookaboutTheme
 
 /**
- * Setup: the number of pictures, the topic and the sky, then Make my list. A long press on the
- * title opens the debug screen; nothing on screen shows it.
+ * Setup: the number of pictures, the topic and the sky, then Make my list. Without a model file,
+ * Download the model takes the place of Make my list, with its progress and Cancel while it runs.
+ * A long press on the title opens the debug screen; nothing on screen shows it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,6 +50,8 @@ fun SetupScreen(
     onChoicesChange: (SetupChoices) -> Unit,
     onMakeList: () -> Unit,
     onTryAgain: () -> Unit,
+    onDownload: () -> Unit,
+    onCancelDownload: () -> Unit,
     onOpenDebug: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -158,6 +165,44 @@ fun SetupScreen(
                         Text("Try again")
                     }
                 }
+                ModelState.Missing -> {
+                    Text(
+                        "Use Wi-Fi. This is needed once.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Button(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
+                        Text("Download the model ($MODEL_SIZE_TEXT)")
+                    }
+                }
+                is ModelState.Downloading -> {
+                    Text(
+                        downloadProgressText(model.percent, model.waiting),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    val percent = model.percent
+                    if (percent == null) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    } else {
+                        LinearProgressIndicator(
+                            progress = { percent / 100f },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    OutlinedButton(onClick = onCancelDownload, modifier = Modifier.fillMaxWidth()) {
+                        Text("Cancel")
+                    }
+                }
+                is ModelState.DownloadFailed -> {
+                    Text(
+                        model.message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    Button(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
+                        Text("Try again")
+                    }
+                }
             }
         }
     }
@@ -181,6 +226,8 @@ private fun SetupLoadingPreview() {
             onChoicesChange = {},
             onMakeList = {},
             onTryAgain = {},
+            onDownload = {},
+            onCancelDownload = {},
             onOpenDebug = {},
         )
     }
@@ -196,6 +243,8 @@ private fun SetupOwnTopicPreview() {
             onChoicesChange = {},
             onMakeList = {},
             onTryAgain = {},
+            onDownload = {},
+            onCancelDownload = {},
             onOpenDebug = {},
         )
     }
@@ -211,6 +260,25 @@ private fun SetupFailedPreview() {
             onChoicesChange = {},
             onMakeList = {},
             onTryAgain = {},
+            onDownload = {},
+            onCancelDownload = {},
+            onOpenDebug = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, heightDp = 800)
+@Composable
+private fun SetupDownloadingPreview() {
+    LookaboutTheme {
+        SetupScreen(
+            choices = SetupChoices(sky = "Clear"),
+            model = ModelState.Downloading(percent = 42, waiting = false),
+            onChoicesChange = {},
+            onMakeList = {},
+            onTryAgain = {},
+            onDownload = {},
+            onCancelDownload = {},
             onOpenDebug = {},
         )
     }
