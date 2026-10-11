@@ -179,13 +179,15 @@ fun WalkScreen(
  * under it when the model is not on the phone or failed to load, and Show results now as a text
  * action at the bottom. No other actions; the screen stays on. With the test texts at 360 x 800
  * dp: 8 + 48 bar + 24 + 240 photo + 28 + 40 + 28 + 4 + 28 + 40 (the test picture text in two
- * lines) = 488; waiting for a missing model adds 28 + 72 for the note (three lines) and 8 + 48
- * for Show results now: 644.
+ * lines) = 488; waiting for a missing model adds 28 + 48 for the note (two lines) and 8 + 48
+ * for Show results now: 620; for a model that failed to load the note takes three lines (72): 644.
  *
  * @param shotIndex the shot whose photo is being checked, or checked first once the model is ready.
  * @param waitingForModel true while the check waits for the model.
  * @param modelUnavailable true when the model is not on the phone or failed to load; a waiting
  *   check says so under the heading.
+ * @param modelMissing true when the model is not on the phone: the note then points to Show
+ *   results now, as the model cannot get ready during the walk.
  * @param canShowResultsNow true when Show results now shows: the check waits for a model that is
  *   not on the phone or failed to load.
  * @param onShowResultsNow stops the check and opens Summary.
@@ -197,6 +199,7 @@ fun EndCheckScreen(
     modifier: Modifier = Modifier,
     waitingForModel: Boolean = false,
     modelUnavailable: Boolean = false,
+    modelMissing: Boolean = false,
     canShowResultsNow: Boolean = false,
     onShowResultsNow: () -> Unit = {},
 ) {
@@ -232,7 +235,7 @@ fun EndCheckScreen(
             }
             Spacer(Modifier.height(StatusGap))
             StatusTitle(endCheckTitle(walk, shotIndex, waitingForModel))
-            val note = if (waitingForModel) modelWaitNote(modelUnavailable) else null
+            val note = if (waitingForModel) modelWaitNote(modelUnavailable, modelMissing) else null
             if (note != null) {
                 Spacer(Modifier.height(StatusGap))
                 SecondaryLine(note)
@@ -598,6 +601,7 @@ private fun EndCheckWaitingPreview() {
             modifier = PreviewBars,
             waitingForModel = true,
             modelUnavailable = true,
+            modelMissing = true,
             canShowResultsNow = true,
         )
     }

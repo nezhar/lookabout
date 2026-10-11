@@ -85,10 +85,15 @@ fun endCheckTitle(walk: Walk, shotIndex: Int, waiting: Boolean): String =
 
 /**
  * The line under the heading while the end check waits for a model that is not on the phone or
- * failed to load ([modelUnavailable]); null while the model loads or downloads.
+ * failed to load ([modelUnavailable]); null while the model loads or downloads. When the model is
+ * not on the phone ([modelMissing]) it cannot get ready during the walk (the download is on
+ * Setup), so the line points to Show results now instead.
  */
-fun modelWaitNote(modelUnavailable: Boolean): String? =
-    if (modelUnavailable) "The model is not on the phone or failed to load. The check starts as soon as it is ready." else null
+fun modelWaitNote(modelUnavailable: Boolean, modelMissing: Boolean = false): String? = when {
+    !modelUnavailable -> null
+    modelMissing -> "The model is not on the phone. You can see the results now."
+    else -> "The model is not on the phone or failed to load. The check starts as soon as it is ready."
+}
 
 /**
  * True when the waiting end check should load the model again: the model failed to load

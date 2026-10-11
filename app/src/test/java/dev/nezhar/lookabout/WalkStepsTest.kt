@@ -263,9 +263,18 @@ class WalkStepsTest {
     @Test
     fun theWaitNoteShowsOnlyForAMissingOrFailedModel() {
         assertNull(modelWaitNote(modelUnavailable = false))
+        assertNull(modelWaitNote(modelUnavailable = false, modelMissing = true))
         assertEquals(
             "The model is not on the phone or failed to load. The check starts as soon as it is ready.",
             modelWaitNote(modelUnavailable = true),
+        )
+    }
+
+    @Test
+    fun theWaitNoteForAMissingModelPointsToTheResults() {
+        assertEquals(
+            "The model is not on the phone. You can see the results now.",
+            modelWaitNote(modelUnavailable = true, modelMissing = true),
         )
     }
 }

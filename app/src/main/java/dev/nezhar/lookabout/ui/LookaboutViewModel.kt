@@ -663,6 +663,13 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
             ModelState.Loading, ModelState.Ready, is ModelState.Downloading -> false
         }
 
+    /**
+     * True when the model is not on the phone (never downloaded, or its download failed): it cannot
+     * get ready during a walk, so the waiting end check points to Show results now.
+     */
+    val modelMissing: Boolean
+        get() = model == ModelState.Missing || model is ModelState.DownloadFailed
+
     private var endCheckJob: Job? = null
 
     /** True when Summary offers Check again: a photo has no result and no check runs. */
