@@ -170,11 +170,13 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
         screen = Screen.Walk
     }
 
-    /** Replaces the walk in progress with an updated one. */
-    fun updateWalk(change: (Walk) -> Walk) {
-        val current = walk ?: return
-        walk = change(current)
+    /** Replaces the walk in progress with an updated one. Returns true when [change] changed it. */
+    fun updateWalk(change: (Walk) -> Walk): Boolean {
+        val current = walk ?: return false
+        val updated = change(current)
+        walk = updated
         saveWalk()
+        return updated != current
     }
 
     /** Finish walk (or Skip on the last picture): shows Summary. */
@@ -336,9 +338,10 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
                 if (answers == null) {
                     pausedCheck = PausedCheck(index, path)
                 } else {
-                    updateWalk { w ->
-                        if (w.shots.getOrNull(index)?.photoPath == path) w.recordCheck(answers, result.modelMs, index).also { buzzVerdict(app, isAccepted(answers)) } else w
+                    val recorded = updateWalk { w ->
+                        if (w.shots.getOrNull(index)?.photoPath == path) w.recordCheck(answers, result.modelMs, index) else w
                     }
+                    if (recorded) buzzVerdict(app, isAccepted(answers))
                 }
             } finally {
                 checking = false
