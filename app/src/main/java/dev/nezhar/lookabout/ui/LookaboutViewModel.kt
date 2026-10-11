@@ -13,6 +13,8 @@ import dev.nezhar.lookabout.Gemma
 import dev.nezhar.lookabout.PausedCheck
 import dev.nezhar.lookabout.Screen
 import dev.nezhar.lookabout.SetupChoices
+import dev.nezhar.lookabout.WALK_FILE_NAME
+import dev.nezhar.lookabout.WalkStore
 import dev.nezhar.lookabout.answersToRecord
 import dev.nezhar.lookabout.backTarget
 import dev.nezhar.lookabout.checkPhoto
@@ -20,6 +22,7 @@ import dev.nezhar.lookabout.listPrompt
 import dev.nezhar.lookabout.modelPath
 import dev.nezhar.lookabout.monthName
 import dev.nezhar.lookabout.timeOfDay
+import dev.nezhar.lookabout.walk.SavedWalk
 import dev.nezhar.lookabout.walk.Walk
 import dev.nezhar.lookabout.walk.isAccepted
 import dev.nezhar.lookabout.writeList
@@ -41,6 +44,9 @@ sealed interface ModelState {
 /**
  * The app's state: the screen, the Setup choices, the current list and walk, and the model's
  * loading state. Starts loading the model as soon as it is created.
+ *
+ * The walk is saved to `filesDir` after every change and loaded again when the ViewModel is
+ * created, so it survives Android closing the app while the camera is open.
  */
 class LookaboutViewModel(application: Application) : AndroidViewModel(application) {
     var screen by mutableStateOf(Screen.Setup)
@@ -67,6 +73,11 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
     private var loadJob: Job? = null
 
     private var writeJob: Job? = null
+
+    private val walkStore = WalkStore(File(application.filesDir, WALK_FILE_NAME))
+
+    /** True once the walker has moved on to Summary for the current walk; saved with the walk. */
+    private var onSummary = false
 
     init {
         loadModel()
@@ -143,17 +154,64 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
     fun startWalk() {
         val current = list ?: return
         walk = current.startWalk(System.currentTimeMillis())
+        onSummary = false
+        saveWalk()
         screen = Screen.Walk
     }
 
     /** Replaces the walk in progress with an updated one. */
     fun updateWalk(change: (Walk) -> Walk) {
-        walk = walk?.let(change)
+        val current = walk ?: return
+        walk = change(current)
+        saveWalk()
     }
 
     /** Finish walk (or Skip on the last picture): shows Summary. */
     fun finishWalk() {
-        if (walk != null) screen = Screen.Summary
+        if (walk == null) return
+        onSummary = true
+        saveWalk()
+        screen = Screen.Summary
+    }
+
+    /** New walk on Summary: the finished walk is dropped, with its saved copy, and Setup shows. */
+    fun newWalk() {
+        walk = null
+        onSummary = false
+        saveWalk()
+        screen = Screen.Setup
+    }
+
+    /** Writes the walk, or deletes the saved one when there is no walk, in the background. */
+    private fun saveWalk() {
+        walkStore.save(walk?.let { SavedWalk(it, onSummary) })
+    }
+
+    /**
+     * Loads the saved walk, if any, and opens where the walker left off: Summary when they had
+     * moved on to it, else Walk, whose screens follow from the current shot. A photo the camera
+     * wrote while the app was closed is checked; an empty or missing one is dropped. A photo
+     * whose check had not come in is checked again.
+     */
+    private fun restoreWalk() {
+        val saved = walkStore.load() ?: return
+        walk = saved.walk
+        onSummary = saved.onSummary
+        screen = if (saved.onSummary) Screen.Summary else Screen.Walk
+        val pending = saved.walk.pendingPhotoPath
+        val shot = saved.walk.current
+        when {
+            pending != null -> {
+                val file = File(pending)
+                if (!saved.onSummary && shot != null && file.length() > 0) {
+                    photoTaken(file)
+                } else {
+                    if (file.isFile && file.length() == 0L) file.delete()
+                    cameraCancelled()
+                }
+            }
+            !saved.onSummary && shot != null && shot.hasPhoto && !shot.isChecked -> checkCurrentPhoto()
+        }
     }
 
     /** Back to Setup, keeping the choices. */
@@ -202,6 +260,9 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
     /** The camera wrote [file]: it becomes the current shot's photo, replacing an older one, and is checked. */
     fun photoTaken(file: File) {
         if (!canTakePhoto) return
+        // Already the current photo: the saved walk was restored and checked it before the camera result came in.
+        val current = walk ?: return
+        if (current.pendingPhotoPath != file.path && current.current?.photoPath == file.path) return
         updateWalk { w ->
             val pending = if (w.pendingPhotoPath == file.path) w else w.photoRequested(file.path)
             pending.photoTaken()
@@ -269,5 +330,10 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
     fun flip(questionIndex: Int) {
         if (checking) return
         updateWalk { it.flip(questionIndex) }
+    }
+
+    // Last in the class: restoring may start a check, which needs every property above.
+    init {
+        restoreWalk()
     }
 }
