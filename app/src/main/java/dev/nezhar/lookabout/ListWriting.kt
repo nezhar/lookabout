@@ -121,14 +121,16 @@ fun completeList(written: List<Picture>, count: Int, random: Random = Random.Def
  *
  * [ask] sends a prompt with a seed and returns the reply; every call gets a new seed from
  * [random]. If fewer than [count] pictures survive [parsePictures], it asks once more and keeps
- * the reply with more of them. [completeList] fills any gap from the built-in list, and a failed
- * call (an exception) counts as a reply without pictures, so the built-in list fills it all.
+ * the reply with more of them, unless [isActive] says the caller no longer wants the list.
+ * [completeList] fills any gap from the built-in list, and a failed call (an exception) counts as
+ * a reply without pictures, so the built-in list fills it all.
  */
 fun writeList(
     prompt: String,
     count: Int,
     ask: (prompt: String, seed: Int) -> String,
     random: Random = Random.Default,
+    isActive: () -> Boolean = { true },
 ): List<Picture> {
     fun attempt(): List<Picture> =
         try {
@@ -138,7 +140,7 @@ fun writeList(
         }
 
     var written = attempt()
-    if (written.size < count) {
+    if (written.size < count && isActive()) {
         val again = attempt()
         if (again.size > written.size) written = again
     }

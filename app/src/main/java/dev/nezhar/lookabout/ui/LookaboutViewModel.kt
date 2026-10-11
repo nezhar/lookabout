@@ -29,6 +29,7 @@ import dev.nezhar.lookabout.writeList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -139,15 +140,25 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
                     try {
                         check(modelReady) { "Model not loaded" }
                         Gemma.ask(text, temperature = 0.8, maxTokens = 600, seed = seed)
-                    } catch (e: Exception) {
-                        Log.w(Gemma.TAG, "Could not write the list", e)
-                        throw e
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (t: Throwable) {
+                        // An empty reply has no pictures, so the built-in list fills the gap.
+                        Log.w(Gemma.TAG, "Could not write the list", t)
+                        ""
                     }
-                })
+                }, isActive = { isActive })
             }
             list = ChallengeList(topic, sky, pictures)
             writingCount = null
         }
+    }
+
+    /** Leaving List: stops any list Gemma is still writing, so the model is free again. */
+    private fun stopWriting() {
+        writeJob?.cancel()
+        writeJob = null
+        writingCount = null
     }
 
     /** Start walk: a new walk from the list, shown on Walk. */
@@ -223,9 +234,14 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
         screen = Screen.Debug
     }
 
-    /** System Back: List, Summary and Debug return to Setup; a walk ignores it. */
+    /**
+     * System Back: List, Summary and Debug return to Setup; a walk ignores it. Leaving List stops
+     * the list being written.
+     */
     fun back() {
-        screen.backTarget?.let { screen = it }
+        val target = screen.backTarget ?: return
+        if (screen == Screen.List) stopWriting()
+        screen = target
     }
 
     /** True while the current photo is being checked: Walk shows Checking and offers no actions. */

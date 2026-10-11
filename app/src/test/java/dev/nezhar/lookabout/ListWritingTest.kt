@@ -265,6 +265,15 @@ class ListWritingTest {
     }
 
     @Test
+    fun noRetryOnceTheCallerStoppedWaiting() {
+        var calls = 0
+        val list = writeList("prompt", 4, { _, _ -> calls++; reply("A") }, isActive = { false })
+        assertEquals(1, calls)
+        assertEquals("A", list.first().text)
+        assertEquals(4, list.size)
+    }
+
+    @Test
     fun everyCallPassesThePrompt() {
         val prompts = mutableListOf<String>()
         writeList("the prompt", 3, { p, _ -> prompts += p; "" })
