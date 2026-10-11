@@ -30,7 +30,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.nezhar.lookabout.acceptedTotalText
+import dev.nezhar.lookabout.NOT_CHECKED_TEXT
 import dev.nezhar.lookabout.agreementText
+import dev.nezhar.lookabout.badgeText
 import dev.nezhar.lookabout.checkTimeText
 import dev.nezhar.lookabout.coverageText
 import dev.nezhar.lookabout.ui.theme.Accepted
@@ -124,17 +126,23 @@ private fun ShotRow(shot: Shot) {
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    OutcomeBadge(shot.outcome)
+                    val badge = badgeText(shot.outcome, shot.hasPhoto)
+                    OutcomeBadge(shot.outcome, badge)
                     val checkMillis = shot.checkMillis
-                    Text(
-                        if (shot.isChecked && checkMillis != null) {
+                    val detail = when {
+                        shot.isChecked && checkMillis != null ->
                             "${coverageText(shot.coveragePercent)} · ${checkTimeText(checkMillis)}"
-                        } else {
-                            "Not checked"
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                        // The badge already says it.
+                        badge == NOT_CHECKED_TEXT -> null
+                        else -> NOT_CHECKED_TEXT
+                    }
+                    if (detail != null) {
+                        Text(
+                            detail,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }
@@ -173,19 +181,16 @@ private fun PhotoTile(photoPath: String?) {
 }
 
 /**
- * The badge: Accepted, Not yet or Skipped, as a word on its colour. A shot that never got a check
- * (only possible if a walk ends on an unchecked picture) reads Skipped.
+ * The badge: [word] (see [badgeText]: Accepted, Not yet, Skipped or Not checked) on the colour of
+ * [outcome]. Skipped and Not checked share the neutral colour.
  */
 @Composable
-private fun OutcomeBadge(outcome: Outcome) {
-    val (word, background, content) = when (outcome) {
-        Outcome.ACCEPTED -> Triple("Accepted", Accepted, Color.White)
-        Outcome.NOT_YET -> Triple("Not yet", NotYet, Color.White)
-        Outcome.SKIPPED, Outcome.PENDING -> Triple(
-            "Skipped",
-            MaterialTheme.colorScheme.surfaceVariant,
-            MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+private fun OutcomeBadge(outcome: Outcome, word: String) {
+    val (background, content) = when (outcome) {
+        Outcome.ACCEPTED -> Accepted to Color.White
+        Outcome.NOT_YET -> NotYet to Color.White
+        Outcome.SKIPPED, Outcome.PENDING ->
+            MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
     }
     Text(
         word,
@@ -248,6 +253,19 @@ private fun SummarySixPreview() {
 private fun SummaryNothingCheckedPreview() {
     val walk = Walk.start("Autumn colour", "Some cloud", builtInPictures.take(3), 1_791_700_000_000L)
         .skip().skip().skip()
+    LookaboutTheme {
+        SummaryScreen(walk = walk, onNewWalk = {})
+    }
+}
+
+/** Check at the end, where the check of the second photo failed: it reads Not checked. */
+@Preview(showBackground = true, widthDp = 360, heightDp = 800)
+@Composable
+private fun SummaryNotCheckedPreview() {
+    val walk = Walk.start("Autumn colour", "Some cloud", builtInPictures.take(3), 1_791_700_000_000L, checkAtEnd = true)
+        .checkedPreview("/preview/1.jpg", listOf(true, true, true, false), 6_200L)
+        .photoRequested("/preview/2.jpg").photoTaken().nextPicture()
+        .checkedPreview("/preview/3.jpg", listOf(true, true, false, false), 5_900L)
     LookaboutTheme {
         SummaryScreen(walk = walk, onNewWalk = {})
     }

@@ -1,5 +1,6 @@
 package dev.nezhar.lookabout
 
+import dev.nezhar.lookabout.walk.Outcome
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -37,3 +38,18 @@ fun acceptedTotalText(accepted: Int, total: Int): String = "$accepted of $total 
  */
 fun agreementText(agreed: Int, checks: Int): String? =
     if (checks <= 0) null else "Gemma and you agreed on $agreed of $checks checks"
+
+/**
+ * The word on a picture's badge on Summary. A shot that is still pending but has a photo had its
+ * check fail (for example at the end of the walk) and reads "Not checked"; a pending shot without
+ * a photo was never shot and reads "Skipped", like a skipped one.
+ */
+fun badgeText(outcome: Outcome, hasPhoto: Boolean): String = when (outcome) {
+    Outcome.ACCEPTED -> "Accepted"
+    Outcome.NOT_YET -> "Not yet"
+    Outcome.SKIPPED -> "Skipped"
+    Outcome.PENDING -> if (hasPhoto) NOT_CHECKED_TEXT else "Skipped"
+}
+
+/** What Summary says about a photo without a check. */
+const val NOT_CHECKED_TEXT = "Not checked"
