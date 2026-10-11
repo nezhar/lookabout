@@ -103,6 +103,23 @@ class WalkArchive(private val dir: File) {
     @Synchronized
     fun load(id: Long): Walk? = read(File(dir, archiveFileName(id)))
 
+    /**
+     * Every photo path the archived walks reference, or null when that is not known for sure: the
+     * folder cannot be listed or an archive file cannot be read.
+     */
+    @Synchronized
+    fun photoPaths(): Set<String>? {
+        if (!dir.exists()) return emptySet()
+        val files = dir.listFiles() ?: return null
+        val paths = HashSet<String>()
+        for (file in files) {
+            if (archiveIdOf(file.name) == null) continue
+            val walk = read(file) ?: return null
+            walk.shots.mapNotNullTo(paths) { it.photoPath }
+        }
+        return paths
+    }
+
     /** Deletes the archived walk with [id]; its photos are left alone. True when it is gone. */
     @Synchronized
     fun delete(id: Long): Boolean {

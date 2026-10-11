@@ -81,6 +81,16 @@ class ArchivedWalks private constructor(dir: File) {
         gone
     }
 
+    /**
+     * Deletes the photo files at [paths] that no archived walk references, after the saves queued
+     * before it. When the archive cannot be read in full, nothing is deleted. Returns how many
+     * files were deleted.
+     */
+    suspend fun deleteUnarchivedPhotos(paths: List<String>): Int = inOrder {
+        val archived = archive.photoPaths() ?: return@inOrder 0
+        paths.filter { it !in archived }.count { File(it).delete() }
+    }
+
     private fun deleteArchived(id: Long): Boolean {
         deleted += id
         return archive.delete(id)

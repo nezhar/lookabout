@@ -112,6 +112,55 @@ class PastWalksTest {
     }
 
     @Test
+    fun retakeDropsTheReplacedPhoto() {
+        val first = Walk.start("Autumn colour", "Clear", builtInPictures.take(3), 1L)
+            .photoRequested("/data/pictures/photo-1.jpg").photoTaken()
+            .recordCheck(listOf(true, false, false, false), 6_000L)
+        val requested = first.photoRequested("/data/pictures/photo-2.jpg")
+        assertTrue(droppedAppPhotos(first, requested, "/data/pictures").isEmpty())
+
+        val retaken = requested.photoTaken()
+        assertEquals(listOf("/data/pictures/photo-1.jpg"), droppedAppPhotos(requested, retaken, "/data/pictures"))
+    }
+
+    @Test
+    fun skipDropsAnUncheckedPhotoButKeepsACheckedOne() {
+        val walk = Walk.start("Autumn colour", "Clear", builtInPictures.take(3), 1L)
+            .photoRequested("/data/pictures/photo-1.jpg").photoTaken()
+        assertEquals(listOf("/data/pictures/photo-1.jpg"), droppedAppPhotos(walk, walk.skip(), "/data/pictures"))
+
+        val checked = walk.recordCheck(listOf(true, false, false, false), 6_000L)
+        assertTrue(droppedAppPhotos(checked, checked.skip(), "/data/pictures").isEmpty())
+    }
+
+    @Test
+    fun aDroppedPhotoOutsideTheAppFolderIsNeverListed() {
+        val walk = Walk.start("Autumn colour", "Clear", builtInPictures.take(3), 1L)
+            .photoRequested("/sdcard/DCIM/photo-1.jpg").photoTaken()
+        assertTrue(droppedAppPhotos(walk, walk.skip(), "/data/pictures").isEmpty())
+    }
+
+    @Test
+    fun aPhotoStillOnAnotherShotIsKept() {
+        val walk = Walk.start("Autumn colour", "Clear", builtInPictures.take(3), 1L)
+            .photoRequested("/data/pictures/photo-1.jpg").photoTaken()
+            .recordCheck(listOf(true, true, true, false), 6_000L)
+            .nextPicture()
+            .photoRequested("/data/pictures/photo-1.jpg").photoTaken()
+        assertTrue(droppedAppPhotos(walk, walk.skip(), "/data/pictures").isEmpty())
+    }
+
+    @Test
+    fun stepsThatKeepThePhotosDropNothing() {
+        val walk = Walk.start("Autumn colour", "Clear", builtInPictures.take(3), 1L)
+            .photoRequested("/data/pictures/photo-1.jpg").photoTaken()
+        val checked = walk.recordCheck(listOf(true, true, true, false), 6_000L)
+        assertTrue(droppedAppPhotos(walk, checked, "/data/pictures").isEmpty())
+        assertTrue(droppedAppPhotos(checked, checked.flip(0), "/data/pictures").isEmpty())
+        assertTrue(droppedAppPhotos(checked, checked.nextPicture(), "/data/pictures").isEmpty())
+    }
+
+    @Test
     fun aWalkWithoutPhotosHasNoneToDelete() {
         val walk = Walk.start("Autumn colour", "Clear", builtInPictures.take(3), 1L).skip().skip().skip()
         assertTrue(appPhotoPaths(walk, "/data/pictures").isEmpty())

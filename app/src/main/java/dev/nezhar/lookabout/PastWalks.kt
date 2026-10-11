@@ -60,3 +60,14 @@ fun appPhotoPaths(walk: Walk, photoDir: String): List<String> {
         .filter { File(it).absoluteFile.normalize().parentFile == dir }
         .distinct()
 }
+
+/**
+ * The app's own photo files (see [appPhotoPaths]) that [before] referenced and [after], the same
+ * walk one step later, no longer does: the photo Retake replaced, or the unchecked photo dropped
+ * when its shot was skipped. A photo still on any shot of [after], or about to be written by the
+ * camera ([Walk.pendingPhotoPath]), is never listed.
+ */
+fun droppedAppPhotos(before: Walk, after: Walk, photoDir: String): List<String> {
+    val kept = after.shots.mapNotNull { it.photoPath }.toSet() + listOfNotNull(after.pendingPhotoPath)
+    return appPhotoPaths(before, photoDir).filter { it !in kept }
+}
