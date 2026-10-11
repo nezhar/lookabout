@@ -4,16 +4,17 @@ import dev.nezhar.lookabout.walk.Outcome
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
 import java.util.Locale
 
-/** The date a walk started, such as "October 11, 2026", in the given zone and locale. */
+/**
+ * The date a walk started as on the deck, such as "10 October 2026": day, month name, year in
+ * this order whatever the locale, with the month named in [locale], in the given zone.
+ */
 fun walkDateText(
     startedAtMillis: Long,
     zone: ZoneId = ZoneId.systemDefault(),
     locale: Locale = Locale.getDefault(),
-): String = DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG)
-    .withLocale(locale)
+): String = DateTimeFormatter.ofPattern("d MMMM yyyy", locale)
     .format(Instant.ofEpochMilli(startedAtMillis).atZone(zone))
 
 /**

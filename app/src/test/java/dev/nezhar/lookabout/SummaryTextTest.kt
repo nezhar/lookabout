@@ -13,8 +13,16 @@ class SummaryTextTest {
     fun dateUsesZoneAndLocale() {
         // 2023-11-14T22:13:20Z
         val millis = 1_700_000_000_000L
-        assertEquals("November 14, 2023", walkDateText(millis, ZoneOffset.UTC, Locale.US))
-        assertEquals("November 15, 2023", walkDateText(millis, ZoneId.of("Asia/Tokyo"), Locale.US))
+        assertEquals("14 November 2023", walkDateText(millis, ZoneOffset.UTC, Locale.ENGLISH))
+        assertEquals("15 November 2023", walkDateText(millis, ZoneId.of("Asia/Tokyo"), Locale.ENGLISH))
+    }
+
+    @Test
+    fun dateReadsDayMonthYearInEveryLocaleOrder() {
+        // 2026-10-10T12:00:00Z; the US order would be "October 10, 2026".
+        val millis = 1_791_633_600_000L
+        assertEquals("10 October 2026", walkDateText(millis, ZoneOffset.UTC, Locale.US))
+        assertEquals("10 October 2026", walkDateText(millis, ZoneOffset.UTC, Locale.ENGLISH))
     }
 
     @Test

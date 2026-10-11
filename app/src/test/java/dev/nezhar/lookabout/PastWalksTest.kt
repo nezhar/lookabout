@@ -41,7 +41,7 @@ class PastWalksTest {
         assertEquals(
             PastWalkRow(
                 id = 1_700_000_000_000L,
-                date = "November 14, 2023",
+                date = "14 November 2023",
                 topic = "Autumn in the city",
                 acceptedText = "3 of 5 accepted",
                 thumbnailPath = "/pictures/photo-1700000000000.jpg",
