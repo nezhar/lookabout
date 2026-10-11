@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -51,15 +52,20 @@ private val PhotoSize = 72.dp
 /**
  * Summary: the topic, the date the walk started, the total, how often the walker and Gemma agreed
  * (only when a photo was checked) and one row per picture with its photo, text, coverage, check
- * time and badge. The rows scroll under the pinned New walk button.
+ * time and badge. The rows scroll under the pinned New walk button, with Check again above it
+ * while a photo has no result.
  *
  * @param onNewWalk returns to Setup.
+ * @param canCheckAgain true when a photo has no result: Check again shows.
+ * @param onCheckAgain checks the photos without a result again, then Summary shows again.
  */
 @Composable
 fun SummaryScreen(
     walk: Walk,
     onNewWalk: () -> Unit,
     modifier: Modifier = Modifier,
+    canCheckAgain: Boolean = false,
+    onCheckAgain: () -> Unit = {},
 ) {
     val date = remember(walk.startedAtMillis) { walkDateText(walk.startedAtMillis) }
     Column(modifier = modifier.fillMaxSize()) {
@@ -96,6 +102,16 @@ fun SummaryScreen(
             }
         }
 
+        if (canCheckAgain) {
+            OutlinedButton(
+                onClick = onCheckAgain,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 24.dp, end = 24.dp, top = 16.dp),
+            ) {
+                Text("Check again")
+            }
+        }
         Button(
             onClick = onNewWalk,
             modifier = Modifier
@@ -267,6 +283,6 @@ private fun SummaryNotCheckedPreview() {
         .photoRequested("/preview/2.jpg").photoTaken().nextPicture()
         .checkedPreview("/preview/3.jpg", listOf(true, true, false, false), 5_900L)
     LookaboutTheme {
-        SummaryScreen(walk = walk, onNewWalk = {})
+        SummaryScreen(walk = walk, onNewWalk = {}, canCheckAgain = true)
     }
 }

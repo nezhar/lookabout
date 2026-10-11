@@ -172,4 +172,85 @@ class WalkStepsTest {
         val noPhotos = Walk.start("Reflections", "Rain", (1..3).map { Picture("P$it", questions) }, 0L, checkAtEnd = true)
         assertEquals(0f, endCheckProgress(noPhotos, 0), 0f)
     }
+
+    /** [walkAtItsEnd] with every photo checked. */
+    private fun allChecked(): Walk = walkAtItsEnd()
+        .recordCheck(listOf(true, true, true, false), 1000, shotIndex = 0)
+        .recordCheck(listOf(true, false, false, false), 1000, shotIndex = 1)
+        .recordCheck(listOf(false, false, false, true), 1000, shotIndex = 3)
+        .recordCheck(listOf(true, true, false, false), 1000, shotIndex = 4)
+
+    @Test
+    fun theEndCheckWaitsForTheModel() {
+        val end = walkAtItsEnd()
+        assertFalse(canStartEndCheck(end, modelReady = false))
+        assertTrue(canStartEndCheck(end, modelReady = true))
+    }
+
+    @Test
+    fun theEndCheckDoesNotStartWithNothingToCheck() {
+        assertFalse(canStartEndCheck(allChecked(), modelReady = true))
+        val noPhotos = Walk.start("Reflections", "Rain", (1..3).map { Picture("P$it", questions) }, 0L, checkAtEnd = true)
+            .skip().skip().skip()
+        assertFalse(canStartEndCheck(noPhotos, modelReady = true))
+    }
+
+    @Test
+    fun summaryOffersCheckAgainForAPhotoWithoutAResult() {
+        val oneFailed = walkAtItsEnd()
+            .recordCheck(listOf(true, true, true, false), 1000, shotIndex = 0)
+            .recordCheck(listOf(false, false, false, true), 1000, shotIndex = 3)
+            .recordCheck(listOf(true, true, false, false), 1000, shotIndex = 4)
+        assertTrue(offersCheckAgain(oneFailed, endCheckRunning = false))
+        // Every check failed, e.g. the model was not ready.
+        assertTrue(offersCheckAgain(walkAtItsEnd(), endCheckRunning = false))
+    }
+
+    @Test
+    fun summaryHidesCheckAgainWhenNothingNeedsChecking() {
+        assertFalse(offersCheckAgain(allChecked(), endCheckRunning = false))
+        // A skipped picture has no photo to check.
+        val skipped = Walk.start("Reflections", "Rain", (1..2).map { Picture("P$it", questions) }, 0L, checkAtEnd = true)
+            .skip().skip()
+        assertFalse(offersCheckAgain(skipped, endCheckRunning = false))
+    }
+
+    @Test
+    fun summaryHidesCheckAgainWhileTheEndCheckRuns() {
+        assertFalse(offersCheckAgain(walkAtItsEnd(), endCheckRunning = true))
+    }
+
+    @Test
+    fun theEndCheckTitleSaysWhenItWaitsForTheModel() {
+        val end = walkAtItsEnd()
+        assertEquals("Getting the model ready", endCheckTitle(end, 0, waiting = true))
+        assertEquals("Checking 2 of 4", endCheckTitle(end, 1, waiting = false))
+    }
+
+    @Test
+    fun aWaitingEndCheckRetriesAFailedLoadOnce() {
+        assertTrue(retriesModelLoad(modelFailed = true, alreadyRetried = false))
+        assertFalse(retriesModelLoad(modelFailed = true, alreadyRetried = true))
+        assertFalse(retriesModelLoad(modelFailed = false, alreadyRetried = false))
+        assertFalse(retriesModelLoad(modelFailed = false, alreadyRetried = true))
+    }
+
+    @Test
+    fun showResultsNowOnlyWhileWaitingForAnUnavailableModel() {
+        assertTrue(offersShowResultsNow(waiting = true, modelUnavailable = true))
+        // Loading or downloading: the model is on its way.
+        assertFalse(offersShowResultsNow(waiting = true, modelUnavailable = false))
+        // Checking already.
+        assertFalse(offersShowResultsNow(waiting = false, modelUnavailable = true))
+        assertFalse(offersShowResultsNow(waiting = false, modelUnavailable = false))
+    }
+
+    @Test
+    fun theWaitNoteShowsOnlyForAMissingOrFailedModel() {
+        assertNull(modelWaitNote(modelUnavailable = false))
+        assertEquals(
+            "The model is not on the phone or failed to load. The check starts as soon as it is ready.",
+            modelWaitNote(modelUnavailable = true),
+        )
+    }
 }

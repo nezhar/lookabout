@@ -11,11 +11,11 @@ An entry for the Hacktoberfest Open-Source AI Challenge, Week 1: Touch Grass.
 3. **Walk**: one picture at a time. Take a photo with the camera app, and Gemma answers the four questions about it. Two or more YES answers and the photo is accepted; otherwise retake it or skip. The phone buzzes with the verdict: one long pulse for Accepted, two short ones for Not yet. Tap a question to change Gemma's answer if it got it wrong (tap again to restore it); the verdict follows. Each photo is also copied to the phone's gallery, in `Pictures/Lookabout`, so you can edit and share it from there.
 4. **Summary**: the topic, the date and how many pictures were accepted, then each picture with its photo, its coverage (the share of YES answers) and how long the check took. A line says how often you and Gemma agreed, counting the answers you left unchanged.
 
-With **Check photos at the end** on, the walk does not wait for Gemma: take a photo, go to the next picture, and at **Finish walk** every photo is checked one after another ("Checking 2 of 5"). A photo whose check fails shows **Not checked** on Summary.
+With **Check photos at the end** on, the walk does not wait for Gemma: take a photo, go to the next picture, and at **Finish walk** every photo is checked one after another ("Checking 2 of 5"). If the model is not ready yet, the check waits for it ("Getting the model ready") and starts by itself once it is. A model that failed to load is tried once more; if it is not on the phone or still fails, **Show results now** opens Summary without the check. A photo whose check fails shows **Not checked** on Summary, where **Check again** checks those photos once more.
 
 During a walk, a silent notice, also shown on the lock screen, shows the current picture and its position, such as "2 of 5". Tapping it opens the walk, and the camera when the picture still needs its photo. Start walk asks once for permission to post notifications (Android 13 and later); without it there is no notice.
 
-The walk is saved on the phone after every change, so it survives Android closing the app while the camera is open: the app opens where you left off and checks a photo taken in the meantime.
+The walk is saved on the phone after every change, so it survives Android closing the app while the camera is open: the app opens where you left off and checks a photo taken in the meantime. With **Check photos at the end** on, that photo is checked at **Finish walk** with the others instead, and a walk closed during the check at the end picks it up again.
 
 Everything runs on the phone. Downloading the model is the only time the app goes online; the lists, the photos and the photo checks never leave the phone.
 
