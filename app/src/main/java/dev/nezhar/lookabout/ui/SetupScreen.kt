@@ -69,8 +69,11 @@ import dev.nezhar.lookabout.ui.theme.screenTitle
 import dev.nezhar.lookabout.ui.theme.sectionLabel
 import dev.nezhar.lookabout.ui.theme.segment
 
-/** Above the title, under the status bar (read off the deck). */
-private val TopPadding = 24.dp
+/**
+ * Above the title row, under the status bar: the deck's 24 dp above the title less the 6 dp the
+ * 48 dp title row adds above the 36 sp title line.
+ */
+private val TopPadding = 18.dp
 
 /** Between the line under the title and the first section. */
 private val HeaderGap = 28.dp
@@ -93,7 +96,8 @@ private val BottomPadding = 16.dp
  * model loads, "Couldn't get the model ready." and Try again when it failed. Without a model file
  * Download the model takes the place of Make my list, with its progress and Cancel while it runs.
  * A long press on the title opens the debug screen; nothing on screen shows it. Once a walk is
- * archived, the text action Past walks shows under the main button.
+ * archived, the text action Past walks shows at the end of the title row, which is always 48 dp
+ * high, so its appearance after the archive is read moves neither the choices nor the main button.
  *
  * @param showPastWalks true when the archive holds a walk: Past walks shows.
  * @param onPastWalks opens Past walks.
@@ -121,13 +125,24 @@ fun SetupScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(start = PageInset, end = PageInset, top = TopPadding, bottom = 8.dp),
         ) {
-            Text(
-                "Lookabout",
-                style = MaterialTheme.typography.screenTitle,
-                modifier = Modifier.pointerInput(Unit) {
-                    detectTapGestures(onLongPress = { openDebug() })
-                },
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = MinTarget),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "Lookabout",
+                    style = MaterialTheme.typography.screenTitle,
+                    modifier = Modifier.pointerInput(Unit) {
+                        detectTapGestures(onLongPress = { openDebug() })
+                    },
+                )
+                Spacer(Modifier.weight(1f))
+                if (showPastWalks) {
+                    TextAction("Past walks", onClick = onPastWalks)
+                }
+            }
             Spacer(Modifier.height(8.dp))
             Text(
                 "A little walk. A fresh look.",
@@ -267,13 +282,6 @@ fun SetupScreen(
                     ErrorLine(model.message)
                     MainButton("Try again", onClick = onDownload)
                 }
-            }
-            if (showPastWalks) {
-                TextAction(
-                    "Past walks",
-                    onClick = onPastWalks,
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                )
             }
         }
     }
@@ -417,7 +425,7 @@ private fun SetupSamplePreview() {
     SetupPreview(sampleChoices, ModelState.Ready)
 }
 
-/** With a walk in the archive: Past walks under Make my list. */
+/** With a walk in the archive: Past walks at the end of the title row. */
 @Preview(showBackground = true, backgroundColor = 0xFFFAFAF7, widthDp = 360, heightDp = 800)
 @Composable
 private fun SetupPastWalksPreview() {
