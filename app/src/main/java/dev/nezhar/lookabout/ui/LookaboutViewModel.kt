@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import dev.nezhar.lookabout.ArchivedWalks
 import dev.nezhar.lookabout.ChallengeList
 import dev.nezhar.lookabout.DOWNLOAD_POLL_MS
 import dev.nezhar.lookabout.DownloadStep
@@ -47,6 +48,7 @@ import dev.nezhar.lookabout.usableModelChoice
 import dev.nezhar.lookabout.waitsForPhoto
 import dev.nezhar.lookabout.walkNotice
 import dev.nezhar.lookabout.walk.SavedWalk
+import dev.nezhar.lookabout.walk.WALK_ARCHIVE_DIR
 import dev.nezhar.lookabout.walk.Walk
 import dev.nezhar.lookabout.walk.isAccepted
 import dev.nezhar.lookabout.writeList
@@ -86,7 +88,8 @@ sealed interface ModelState {
  * loading state. Starts loading the model as soon as it is created.
  *
  * The walk is saved to `filesDir` after every change and loaded again when the ViewModel is
- * created, so it survives Android closing the app while the camera is open.
+ * created, so it survives Android closing the app while the camera is open. A walk that reaches
+ * Summary is also kept in the walk archive, and saved there again whenever its results change.
  */
 class LookaboutViewModel(application: Application) : AndroidViewModel(application) {
     var screen by mutableStateOf(Screen.Setup)
@@ -115,6 +118,9 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
     private var writeJob: Job? = null
 
     private val walkStore = WalkStore(File(application.filesDir, WALK_FILE_NAME))
+
+    /** Every walk that reached Summary, with its results. */
+    val archivedWalks = ArchivedWalks(File(application.filesDir, WALK_ARCHIVE_DIR))
 
     private val downloader = ModelDownloader(application)
 
@@ -399,7 +405,10 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
         screen = Screen.Summary
     }
 
-    /** New walk on Summary: the finished walk is dropped, with its saved copy, and Setup shows. */
+    /**
+     * New walk on Summary: the finished walk is dropped, with its saved copy, and Setup shows. Its
+     * archived copy and its photos stay.
+     */
     fun newWalk() {
         endCheckJob?.cancel()
         walk = null
@@ -408,9 +417,14 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
         screen = Screen.Setup
     }
 
-    /** Writes the walk, or deletes the saved one when there is no walk, in the background. */
+    /**
+     * Writes the walk, or deletes the saved one when there is no walk, in the background. A walk on
+     * Summary is also written to the archive, so it always holds the latest results.
+     */
     private fun saveWalk() {
-        walkStore.save(walk?.let { SavedWalk(it, onSummary) })
+        val current = walk
+        walkStore.save(current?.let { SavedWalk(it, onSummary) })
+        if (current != null && onSummary) archivedWalks.save(current)
     }
 
     /**
@@ -425,6 +439,8 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
         val saved = walkStore.load() ?: return
         walk = saved.walk
         onSummary = saved.onSummary
+        // A walk that reached Summary before the archive existed, or just before the app closed.
+        if (saved.onSummary) archivedWalks.save(saved.walk)
         screen = if (saved.onSummary) Screen.Summary else Screen.Walk
         val pending = saved.walk.pendingPhotoPath
         val shot = saved.walk.current
