@@ -139,10 +139,10 @@ object Gemma {
 }
 
 /**
- * The model file: the app's own files folder if the file is there, otherwise the path used
- * during development.
+ * The model file: the app's own files folder if the file is there (the in-app download puts it
+ * there), otherwise the path used during development.
  */
 fun modelPath(context: Context): String {
-    val own = File(context.filesDir, "gemma-4-E2B-it.litertlm")
-    return if (own.exists()) own.path else "/data/local/tmp/llm/gemma-4-E2B-it.litertlm"
+    val own = File(context.filesDir, MODEL_FILE_NAME)
+    return if (own.exists()) own.path else "/data/local/tmp/llm/$MODEL_FILE_NAME"
 }

@@ -10,7 +10,11 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.nezhar.lookabout.ChallengeList
+import dev.nezhar.lookabout.DOWNLOAD_POLL_MS
+import dev.nezhar.lookabout.DownloadStep
 import dev.nezhar.lookabout.Gemma
+import dev.nezhar.lookabout.ModelDownloader
+import dev.nezhar.lookabout.ModelStart
 import dev.nezhar.lookabout.PausedCheck
 import dev.nezhar.lookabout.Screen
 import dev.nezhar.lookabout.SetupChoices
@@ -21,8 +25,10 @@ import dev.nezhar.lookabout.answersToRecord
 import dev.nezhar.lookabout.backTarget
 import dev.nezhar.lookabout.checkPhoto
 import dev.nezhar.lookabout.copyToGallery
+import dev.nezhar.lookabout.downloadStep
 import dev.nezhar.lookabout.listPrompt
 import dev.nezhar.lookabout.modelPath
+import dev.nezhar.lookabout.modelStart
 import dev.nezhar.lookabout.monthName
 import dev.nezhar.lookabout.timeOfDay
 import dev.nezhar.lookabout.waitsForPhoto
@@ -34,6 +40,8 @@ import dev.nezhar.lookabout.writeList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -45,6 +53,15 @@ sealed interface ModelState {
     data object Loading : ModelState
     data object Ready : ModelState
     data class Failed(val message: String) : ModelState
+
+    /** No model file and no download: Setup offers the download. */
+    data object Missing : ModelState
+
+    /** The model downloads; [percent] is null while unknown, [waiting] while it waits for Wi-Fi. */
+    data class Downloading(val percent: Int?, val waiting: Boolean) : ModelState
+
+    /** The download failed or was stopped: Setup shows [message] and Try again. */
+    data class DownloadFailed(val message: String) : ModelState
 }
 
 /**
@@ -82,6 +99,8 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val walkStore = WalkStore(File(application.filesDir, WALK_FILE_NAME))
 
+    private val downloader = ModelDownloader(application)
+
     /** True once the walker has moved on to Summary for the current walk; saved with the walk. */
     private var onSummary = false
 
@@ -89,23 +108,125 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
         loadModel()
     }
 
-    /** Loads the model off the main thread. Also Try again after a failed load. */
+    /**
+     * Loads the model off the main thread when its file is there; otherwise follows a download
+     * started earlier, or offers the download. Also Try again after a failed load.
+     */
     fun loadModel() {
         if (loadJob?.isActive == true || model == ModelState.Ready) return
         model = ModelState.Loading
         val app = getApplication<Application>()
-        loadJob = viewModelScope.launch {
-            model = try {
-                withContext(Dispatchers.Default) {
-                    Gemma.load(modelPath(app), app.cacheDir.path)
+        launchModelJob {
+            val (found, id) = withContext(Dispatchers.IO) {
+                File(modelPath(app)).exists() to downloader.savedId()
+            }
+            when (modelStart(found, id)) {
+                ModelStart.Load -> {
+                    // A remembered download is not needed any more.
+                    if (id != null) withContext(Dispatchers.IO) { downloader.discard(id) }
+                    loadFromFile()
                 }
-                ModelState.Ready
+                ModelStart.FollowDownload -> if (id != null) followDownload(id)
+                ModelStart.OfferDownload -> model = ModelState.Missing
+            }
+        }
+    }
+
+    /** Download the model on Setup, and Try again after a failed download. */
+    fun downloadModel() {
+        if (loadJob?.isActive == true) return
+        if (model != ModelState.Missing && model !is ModelState.DownloadFailed) return
+        model = ModelState.Downloading(percent = null, waiting = false)
+        launchModelJob {
+            val id = try {
+                withContext(Dispatchers.IO) { downloader.start() }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (t: Throwable) {
-                Log.e(Gemma.TAG, "Could not load the model", t)
-                ModelState.Failed(t.message ?: t.javaClass.simpleName)
+                Log.e(Gemma.TAG, "Could not start the model download", t)
+                model = ModelState.DownloadFailed("The download did not start: ${t.message ?: t.javaClass.simpleName}")
+                return@launchModelJob
             }
+            followDownload(id)
+        }
+    }
+
+    /** Cancel while the model downloads: stops the download, deletes its file, offers it again. */
+    fun cancelDownload() {
+        if (model !is ModelState.Downloading) return
+        val running = loadJob
+        model = ModelState.Missing
+        launchModelJob {
+            // Waits for a download that is just being started, so its id is saved before it goes.
+            running?.cancelAndJoin()
+            withContext(Dispatchers.IO) { downloader.savedId()?.let { downloader.discard(it) } }
+        }
+    }
+
+    /** Runs [block] as the model job; an unexpected error shows as a failed load with Try again. */
+    private fun launchModelJob(block: suspend () -> Unit) {
+        loadJob = viewModelScope.launch {
+            try {
+                block()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (t: Throwable) {
+                Log.e(Gemma.TAG, "Could not get the model ready", t)
+                model = ModelState.Failed(t.message ?: t.javaClass.simpleName)
+            }
+        }
+    }
+
+    private suspend fun loadFromFile() {
+        val app = getApplication<Application>()
+        model = ModelState.Loading
+        model = try {
+            withContext(Dispatchers.Default) {
+                Gemma.load(modelPath(app), app.cacheDir.path)
+            }
+            ModelState.Ready
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (t: Throwable) {
+            Log.e(Gemma.TAG, "Could not load the model", t)
+            ModelState.Failed(t.message ?: t.javaClass.simpleName)
+        }
+    }
+
+    /**
+     * Shows the download's progress, asking the system every [DOWNLOAD_POLL_MS], until it ends.
+     * A finished download is moved into `filesDir` and loaded as at app start.
+     */
+    private suspend fun followDownload(id: Long) {
+        while (true) {
+            val snapshot = withContext(Dispatchers.IO) { downloader.query(id) }
+            when (val step = downloadStep(snapshot)) {
+                is DownloadStep.Running -> model = ModelState.Downloading(step.percent, step.waiting)
+                DownloadStep.Finished -> {
+                    model = ModelState.Loading
+                    val moved = try {
+                        withContext(Dispatchers.IO) { downloader.install(snapshot?.localPath) }
+                        true
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (t: Throwable) {
+                        Log.e(Gemma.TAG, "Could not move the downloaded model", t)
+                        model = ModelState.DownloadFailed(
+                            "The model could not be saved: ${t.message ?: t.javaClass.simpleName}"
+                        )
+                        false
+                    }
+                    withContext(Dispatchers.IO) { downloader.discard(id) }
+                    if (moved) loadFromFile()
+                    return
+                }
+                is DownloadStep.Failed -> {
+                    withContext(Dispatchers.IO) { downloader.discard(id) }
+                    model = ModelState.DownloadFailed(step.message)
+                    return
+                }
+            }
+            delay(DOWNLOAD_POLL_MS)
         }
     }
 
