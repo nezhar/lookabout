@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.nezhar.lookabout.Screen
 import dev.nezhar.lookabout.backTarget
+import dev.nezhar.lookabout.offersPastWalks
 
 /**
  * The app shell: the ViewModel's screen value decides which screen shows. [noticeTaps] counts taps
@@ -46,6 +47,7 @@ fun LookaboutApp(noticeTaps: Int = 0, viewModel: LookaboutViewModel = viewModel(
         val walk = viewModel.walk
         val writingCount = viewModel.writingCount
         val endCheckIndex = viewModel.endCheckIndex
+        val pastWalk = viewModel.pastWalk
         when {
             // Make my list and New list both write for the topic and sky chosen on Setup.
             screen == Screen.List && writingCount != null -> ListProgress(
@@ -93,6 +95,21 @@ fun LookaboutApp(noticeTaps: Int = 0, viewModel: LookaboutViewModel = viewModel(
                 onCheckAgain = viewModel::checkAgain,
                 modifier = modifier,
             )
+            // A past walk, read-only: Back returns to Past walks.
+            screen == Screen.PastSummary && pastWalk != null -> SummaryScreen(
+                walk = pastWalk,
+                onNewWalk = viewModel::closePastWalk,
+                readOnly = true,
+                onBack = viewModel::closePastWalk,
+                modifier = modifier,
+            )
+            screen == Screen.PastWalks || screen == Screen.PastSummary -> PastWalksScreen(
+                pastWalks = viewModel.pastWalks,
+                onOpen = viewModel::openPastWalk,
+                onDelete = viewModel::deletePastWalk,
+                onBack = viewModel::back,
+                modifier = modifier,
+            )
             screen == Screen.Debug -> DebugScreen(
                 onBack = viewModel::showSetup,
                 canChooseModel = viewModel.canChooseModel,
@@ -112,6 +129,8 @@ fun LookaboutApp(noticeTaps: Int = 0, viewModel: LookaboutViewModel = viewModel(
                 onDownload = viewModel::downloadModel,
                 onCancelDownload = viewModel::cancelDownload,
                 onOpenDebug = viewModel::openDebug,
+                showPastWalks = offersPastWalks(viewModel.pastWalks),
+                onPastWalks = viewModel::showPastWalks,
                 modifier = modifier,
             )
         }

@@ -12,17 +12,25 @@ enum class Screen {
 
     /** Model test and the photo check, opened by a long press on the Setup title. */
     Debug,
+
+    /** Every archived walk, newest first, opened by Past walks on Setup. */
+    PastWalks,
+
+    /** One archived walk on the Summary screen, read-only, opened from Past walks. */
+    PastSummary,
 }
 
 /**
- * Where system Back leads from this screen: List, Summary and Debug return to Setup, a walk
- * ignores Back (it returns itself), and on Setup it is null, so Back leaves the app as usual.
+ * Where system Back leads from this screen: List, Summary, Debug and Past walks return to Setup, a
+ * past walk's Summary returns to Past walks, a walk ignores Back (it returns itself), and on Setup
+ * it is null, so Back leaves the app as usual.
  */
 val Screen.backTarget: Screen?
     get() = when (this) {
         Screen.Setup -> null
         Screen.Walk -> Screen.Walk
-        Screen.List, Screen.Summary, Screen.Debug -> Screen.Setup
+        Screen.List, Screen.Summary, Screen.Debug, Screen.PastWalks -> Screen.Setup
+        Screen.PastSummary -> Screen.PastWalks
     }
 
 /** The numbers of pictures Setup offers. */

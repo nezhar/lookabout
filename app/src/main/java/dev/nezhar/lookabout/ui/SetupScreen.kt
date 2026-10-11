@@ -92,7 +92,11 @@ private val BottomPadding = 16.dp
  * field; the main button stays pinned at the bottom: "Getting the model ready" (disabled) while the
  * model loads, "Couldn't get the model ready." and Try again when it failed. Without a model file
  * Download the model takes the place of Make my list, with its progress and Cancel while it runs.
- * A long press on the title opens the debug screen; nothing on screen shows it.
+ * A long press on the title opens the debug screen; nothing on screen shows it. Once a walk is
+ * archived, the text action Past walks shows under the main button.
+ *
+ * @param showPastWalks true when the archive holds a walk: Past walks shows.
+ * @param onPastWalks opens Past walks.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -106,6 +110,8 @@ fun SetupScreen(
     onCancelDownload: () -> Unit,
     onOpenDebug: () -> Unit,
     modifier: Modifier = Modifier,
+    showPastWalks: Boolean = false,
+    onPastWalks: () -> Unit = {},
 ) {
     val openDebug by rememberUpdatedState(onOpenDebug)
     Column(modifier = modifier.fillMaxSize()) {
@@ -262,6 +268,13 @@ fun SetupScreen(
                     MainButton("Try again", onClick = onDownload)
                 }
             }
+            if (showPastWalks) {
+                TextAction(
+                    "Past walks",
+                    onClick = onPastWalks,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                )
+            }
         }
     }
 }
@@ -374,7 +387,7 @@ private val PreviewBars = Modifier.padding(top = 24.dp, bottom = 24.dp)
 private val sampleChoices = SetupChoices(ownTopic = true, ownText = "Autumn in the city", sky = "Overcast")
 
 @Composable
-private fun SetupPreview(choices: SetupChoices, model: ModelState) {
+private fun SetupPreview(choices: SetupChoices, model: ModelState, showPastWalks: Boolean = false) {
     LookaboutTheme {
         SetupScreen(
             choices = choices,
@@ -386,6 +399,7 @@ private fun SetupPreview(choices: SetupChoices, model: ModelState) {
             onCancelDownload = {},
             onOpenDebug = {},
             modifier = PreviewBars,
+            showPastWalks = showPastWalks,
         )
     }
 }
@@ -401,6 +415,13 @@ private fun SetupDefaultsPreview() {
 @Composable
 private fun SetupSamplePreview() {
     SetupPreview(sampleChoices, ModelState.Ready)
+}
+
+/** With a walk in the archive: Past walks under Make my list. */
+@Preview(showBackground = true, backgroundColor = 0xFFFAFAF7, widthDp = 360, heightDp = 800)
+@Composable
+private fun SetupPastWalksPreview() {
+    SetupPreview(sampleChoices, ModelState.Ready, showPastWalks = true)
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFFFAFAF7, widthDp = 412, heightDp = 915)

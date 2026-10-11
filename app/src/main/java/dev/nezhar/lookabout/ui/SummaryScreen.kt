@@ -90,9 +90,14 @@ private val ChipIconSize = 16.dp
  * Check again as a text action under it while a photo has no result; when the rows do not fit,
  * such as six pictures at 360 dp, everything above them scrolls under them.
  *
+ * A past walk shows [readOnly]: the same contact sheet, with Back in place of New walk and never
+ * Check again. Summary offers no corrections, so its results cannot change there either way.
+ *
  * @param onNewWalk returns to Setup.
  * @param canCheckAgain true when a photo has no result: Check again shows.
  * @param onCheckAgain checks the photos without a result again, then Summary shows again.
+ * @param readOnly true for a past walk from the archive.
+ * @param onBack Back on a read-only Summary: returns to Past walks.
  */
 @Composable
 fun SummaryScreen(
@@ -101,6 +106,8 @@ fun SummaryScreen(
     modifier: Modifier = Modifier,
     canCheckAgain: Boolean = false,
     onCheckAgain: () -> Unit = {},
+    readOnly: Boolean = false,
+    onBack: () -> Unit = {},
 ) {
     val date = remember(walk.startedAtMillis) { walkDateText(walk.startedAtMillis) }
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
@@ -147,8 +154,12 @@ fun SummaryScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(ActionGap),
             ) {
-                MainButton("New walk", onClick = onNewWalk)
-                if (canCheckAgain) {
+                if (readOnly) {
+                    MainButton("Back", onClick = onBack)
+                } else {
+                    MainButton("New walk", onClick = onNewWalk)
+                }
+                if (canCheckAgain && !readOnly) {
                     TextAction("Check again", onClick = onCheckAgain)
                 }
             }
@@ -237,12 +248,12 @@ private fun ShotRow(
 
 /**
  * The photo as a square with 12 dp corners, decoded off the main thread at that size, or without
- * a photo a neutral tile with the skip icon and "No photo".
+ * a photo a neutral tile with the skip icon and "No photo". Also the thumbnail on Past walks.
  */
 @Composable
-private fun Thumbnail(photoPath: String?, side: Dp) {
+internal fun Thumbnail(photoPath: String?, side: Dp, modifier: Modifier = Modifier) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(side)
             .clip(RoundedCornerShape(ChipRadius))
             .background(NeutralFill),
@@ -366,6 +377,21 @@ private fun SummaryWidePreview() {
 private fun SummarySixPreview() {
     LookaboutTheme {
         SummaryScreen(walk = previewWalk(6), onNewWalk = {}, modifier = PreviewBars)
+    }
+}
+
+/** A past walk from the archive: Back in place of New walk, and no Check again. */
+@Preview(showBackground = true, backgroundColor = 0xFFFAFAF7, widthDp = 360, heightDp = 800)
+@Composable
+private fun SummaryReadOnlyPreview() {
+    LookaboutTheme {
+        SummaryScreen(
+            walk = previewWalk(5),
+            onNewWalk = {},
+            modifier = PreviewBars,
+            canCheckAgain = true,
+            readOnly = true,
+        )
     }
 }
 
