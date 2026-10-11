@@ -18,6 +18,13 @@ fun LookaboutApp(viewModel: LookaboutViewModel = viewModel()) {
     val screen = viewModel.screen
     // On Setup Back is not handled, so it leaves the app; during a walk it is consumed and ignored.
     BackHandler(enabled = screen.backTarget != null) { viewModel.back() }
+    // Shoot and Retake on Walk hand off to the camera app; the result goes to the ViewModel.
+    val openCamera = rememberCameraHandoff(
+        onPhoto = viewModel::photoTaken,
+        onCancelled = viewModel::cameraCancelled,
+        onLaunch = viewModel::photoRequested,
+    )
+    val takePhoto: () -> Unit = { if (viewModel.canTakePhoto) openCamera() }
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         val modifier = Modifier
@@ -36,9 +43,11 @@ fun LookaboutApp(viewModel: LookaboutViewModel = viewModel()) {
             screen == Screen.Walk && walk != null -> WalkScreen(
                 walk = walk,
                 checking = viewModel.checking,
-                onShoot = viewModel::shoot,
+                checkPaused = viewModel.checkPaused,
+                onShoot = takePhoto,
                 onSkip = viewModel::skip,
-                onRetake = viewModel::retake,
+                onRetake = takePhoto,
+                onTryAgain = viewModel::tryAgain,
                 onNextPicture = viewModel::nextPicture,
                 onFinish = viewModel::finishWalk,
                 modifier = modifier,

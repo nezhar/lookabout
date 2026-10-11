@@ -1,9 +1,11 @@
 package dev.nezhar.lookabout
 
-import dev.nezhar.lookabout.walk.Outcome
 import dev.nezhar.lookabout.walk.Shot
 import dev.nezhar.lookabout.walk.builtInPictures
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WalkStepsTest {
@@ -63,18 +65,38 @@ class WalkStepsTest {
     }
 
     @Test
-    fun standInAnswersFollowTheSampleWalk() {
-        assertEquals("75%, 3 of 4", coverageText(standInAnswers(0)))
-        assertEquals("25%, 1 of 4", coverageText(standInAnswers(1)))
-        assertEquals("100%, 4 of 4", coverageText(standInAnswers(2)))
-        assertEquals("25%, 1 of 4", coverageText(standInAnswers(3)))
-        assertEquals(standInAnswers(0), standInAnswers(4))
-        assertEquals(standInAnswers(1), standInAnswers(5))
+    fun aPausedCheckShowsCheckPaused() {
+        assertEquals(WalkStep.CheckPaused, walkStep(withPhoto, checking = false, paused = true))
     }
 
     @Test
-    fun standInAnswersShowBothVerdicts() {
-        val outcomes = (0..3).map { withPhoto.withCheck(standInAnswers(it), 2000).outcome }
-        assertEquals(listOf(Outcome.ACCEPTED, Outcome.NOT_YET, Outcome.ACCEPTED, Outcome.NOT_YET), outcomes)
+    fun checkingWinsOverAPausedCheck() {
+        assertEquals(WalkStep.Checking, walkStep(withPhoto, checking = true, paused = true))
+    }
+
+    @Test
+    fun aPausedCheckNeedsAnUncheckedPhoto() {
+        assertEquals(WalkStep.NextPicture, walkStep(fresh, checking = false, paused = true))
+        val checked = withPhoto.withCheck(listOf(true, true, true, true), 2000)
+        assertEquals(WalkStep.Accepted, walkStep(checked, checking = false, paused = true))
+    }
+
+    @Test
+    fun aPausedCheckAppliesToItsShotAndPhotoOnly() {
+        val paused = PausedCheck(shotIndex = 1, photoPath = "/photos/1.jpg")
+        assertTrue(paused.appliesTo(1, withPhoto))
+        assertFalse(paused.appliesTo(0, withPhoto))
+        assertFalse(paused.appliesTo(1, fresh.withPhoto("/photos/2.jpg")))
+        assertFalse(paused.appliesTo(1, fresh))
+        assertFalse(paused.appliesTo(1, null))
+        assertFalse(paused.appliesTo(1, withPhoto.withCheck(listOf(true, false, false, false), 2000)))
+    }
+
+    @Test
+    fun answersAreRecordedOnlyForASuccessfulCheck() {
+        val answers = listOf(true, false, true, true)
+        assertEquals(answers, answersToRecord(CheckResult(answers, 1800, "1 YES", null)))
+        assertNull(answersToRecord(CheckResult.failed("No readable answer", 1800, "hmm")))
+        assertNull(answersToRecord(CheckResult(listOf(true), 1800, "1 YES", null)))
     }
 }

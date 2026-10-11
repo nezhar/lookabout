@@ -19,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.nezhar.lookabout.WalkStep
@@ -35,13 +36,16 @@ import dev.nezhar.lookabout.walkStep
 private val BottomButtonHeight = 56.dp
 
 /**
- * Walk: one picture at a time, in four screens: Next picture, Checking, Accepted and Not yet.
- * Which one shows follows from the current shot and [checking] (see [walkStep]).
+ * Walk: one picture at a time, in four screens: Next picture, Checking, Accepted and Not yet,
+ * plus Check paused after a failed check. Which one shows follows from the current shot,
+ * [checking] and [checkPaused] (see [walkStep]). The screen stays on while Checking shows.
  *
  * @param checking true while the current photo is being checked; no actions are offered then.
+ * @param checkPaused true when the check of the current photo failed.
  * @param onShoot takes a photo for the current picture (Next picture).
- * @param onSkip moves on without an accepted photo (Next picture, Not yet); on the last picture it opens Summary.
+ * @param onSkip moves on without an accepted photo (Next picture, Not yet, Check paused); on the last picture it opens Summary.
  * @param onRetake takes a new photo for the current picture (Not yet).
+ * @param onTryAgain checks the same photo again (Check paused).
  * @param onNextPicture moves on after Accepted; on the last picture this is Finish walk and opens Summary.
  * @param onFinish opens Summary; only offered if the walk is already past its last picture.
  */
@@ -49,9 +53,11 @@ private val BottomButtonHeight = 56.dp
 fun WalkScreen(
     walk: Walk,
     checking: Boolean,
+    checkPaused: Boolean,
     onShoot: () -> Unit,
     onSkip: () -> Unit,
     onRetake: () -> Unit,
+    onTryAgain: () -> Unit,
     onNextPicture: () -> Unit,
     onFinish: () -> Unit,
     modifier: Modifier = Modifier,
@@ -67,9 +73,12 @@ fun WalkScreen(
         }
         return
     }
-    when (walkStep(shot, checking)) {
+    when (walkStep(shot, checking, checkPaused)) {
         WalkStep.NextPicture -> NextPictureScreen(walk, shot, onShoot, onSkip, screenModifier)
-        WalkStep.Checking -> CheckingScreen(walk, shot, screenModifier)
+        WalkStep.Checking -> {
+            KeepScreenOn()
+            CheckingScreen(walk, shot, screenModifier)
+        }
         WalkStep.Accepted -> VerdictScreen(shot, accepted = true, modifier = screenModifier) {
             MainButton(
                 if (walk.isLast) "Finish walk" else "Next picture",
@@ -80,6 +89,10 @@ fun WalkScreen(
         WalkStep.NotYet -> VerdictScreen(shot, accepted = false, modifier = screenModifier) {
             SecondaryButton("Skip", onSkip, Modifier.weight(1f))
             MainButton("Retake", onRetake, Modifier.weight(1f))
+        }
+        WalkStep.CheckPaused -> CheckPausedScreen(shot, modifier = screenModifier) {
+            SecondaryButton("Skip", onSkip, Modifier.weight(1f))
+            MainButton("Try again", onTryAgain, Modifier.weight(1f))
         }
     }
 }
@@ -200,6 +213,50 @@ private fun VerdictScreen(
     }
 }
 
+/**
+ * Check paused: the check of the photo failed. The title, one line of text and the photo, laid
+ * out like Not yet, then [buttons] at the bottom. No result is shown.
+ */
+@Composable
+private fun CheckPausedScreen(
+    shot: Shot,
+    modifier: Modifier = Modifier,
+    buttons: @Composable RowScope.() -> Unit,
+) {
+    Column(modifier = modifier) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column {
+                Text(
+                    "Check paused",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text("Couldn't check this photo.", style = MaterialTheme.typography.titleLarge)
+            }
+            WalkPhoto(
+                shot.photoPath,
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .align(Alignment.CenterHorizontally)
+                    .heightIn(min = 80.dp)
+                    .aspectRatio(4f / 3f),
+            )
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            content = buttons,
+        )
+    }
+}
+
 @Composable
 private fun MainButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Button(onClick = onClick, modifier = modifier.heightIn(min = BottomButtonHeight)) {
@@ -239,7 +296,7 @@ private fun Walk.withPreviewPhoto(): Walk = photoRequested("/preview/photo.jpg")
 @Composable
 private fun NextPicturePreview() {
     LookaboutTheme {
-        WalkScreen(previewWalk(), false, {}, {}, {}, {}, {})
+        WalkScreen(previewWalk(), false, false, {}, {}, {}, {}, {}, {})
     }
 }
 
@@ -247,7 +304,7 @@ private fun NextPicturePreview() {
 @Composable
 private fun CheckingPreview() {
     LookaboutTheme {
-        WalkScreen(previewWalk().withPreviewPhoto(), true, {}, {}, {}, {}, {})
+        WalkScreen(previewWalk().withPreviewPhoto(), true, false, {}, {}, {}, {}, {}, {})
     }
 }
 
@@ -256,7 +313,7 @@ private fun CheckingPreview() {
 private fun AcceptedPreview() {
     val walk = previewWalk().withPreviewPhoto().recordCheck(listOf(true, true, false, true), 2000)
     LookaboutTheme {
-        WalkScreen(walk, false, {}, {}, {}, {}, {})
+        WalkScreen(walk, false, false, {}, {}, {}, {}, {}, {})
     }
 }
 
@@ -265,6 +322,14 @@ private fun AcceptedPreview() {
 private fun NotYetPreview() {
     val walk = previewWalk().withPreviewPhoto().recordCheck(listOf(false, true, false, false), 2000)
     LookaboutTheme {
-        WalkScreen(walk, false, {}, {}, {}, {}, {})
+        WalkScreen(walk, false, false, {}, {}, {}, {}, {}, {})
+    }
+}
+
+@Preview(showBackground = true, widthDp = 360, heightDp = 800)
+@Composable
+private fun CheckPausedPreview() {
+    LookaboutTheme {
+        WalkScreen(previewWalk().withPreviewPhoto(), false, true, {}, {}, {}, {}, {}, {})
     }
 }

@@ -1,6 +1,7 @@
 package dev.nezhar.lookabout.ui
 
 import android.app.Application
+import android.net.Uri
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -9,18 +10,18 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.nezhar.lookabout.ChallengeList
 import dev.nezhar.lookabout.Gemma
+import dev.nezhar.lookabout.PausedCheck
 import dev.nezhar.lookabout.Screen
-import dev.nezhar.lookabout.STAND_IN_CHECK_MILLIS
 import dev.nezhar.lookabout.SetupChoices
+import dev.nezhar.lookabout.answersToRecord
 import dev.nezhar.lookabout.backTarget
+import dev.nezhar.lookabout.checkPhoto
 import dev.nezhar.lookabout.modelPath
-import dev.nezhar.lookabout.standInAnswers
 import dev.nezhar.lookabout.walk.Walk
 import dev.nezhar.lookabout.walk.pickBuiltInPictures
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -134,27 +135,44 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
     var checking by mutableStateOf(false)
         private set
 
-    /**
-     * Shoot (and Retake): a new photo for the current picture, then its check. Ignored while a
-     * check runs, so a result always belongs to the photo it was made for.
-     *
-     * Stand-in until PW-14: there is no camera yet, so the photo is a path without a file (Walk
-     * shows a plain box for it) and it is taken at once.
-     */
-    fun shoot() {
-        if (checking || walk?.current == null) return
-        val path = File(getApplication<Application>().cacheDir, "stand-in-${System.currentTimeMillis()}.jpg").path
-        updateWalk { it.photoRequested(path) }
-        photoTaken()
+    /** The last failed check, if any; it shows as Check paused while its shot still holds that photo. */
+    private var pausedCheck by mutableStateOf<PausedCheck?>(null)
+
+    /** True when the current photo's check failed: Walk shows Check paused with Try again and Skip. */
+    val checkPaused: Boolean
+        get() {
+            val current = walk ?: return false
+            return pausedCheck?.appliesTo(current.currentIndex, current.current) == true
+        }
+
+    /** True when Shoot or Retake may open the camera: on a shot, with no check running. */
+    val canTakePhoto: Boolean
+        get() = !checking && walk?.current != null
+
+    /** The camera is about to open for Shoot or Retake: it writes the photo to [file]. */
+    fun photoRequested(file: File) {
+        if (!canTakePhoto) return
+        updateWalk { it.photoRequested(file.path) }
     }
 
-    /** Retake on Not yet: the same as Shoot. */
-    fun retake() = shoot()
+    /** The camera was cancelled or could not open: the pending photo is dropped, nothing else changes. */
+    fun cameraCancelled() {
+        updateWalk { it.cameraCancelled() }
+    }
 
-    /** The camera wrote the pending photo: it becomes the current shot's photo and is checked. */
-    fun photoTaken() {
-        if (checking || walk?.pendingPhotoPath == null) return
-        updateWalk { it.photoTaken() }
+    /** The camera wrote [file]: it becomes the current shot's photo, replacing an older one, and is checked. */
+    fun photoTaken(file: File) {
+        if (!canTakePhoto) return
+        updateWalk { w ->
+            val pending = if (w.pendingPhotoPath == file.path) w else w.photoRequested(file.path)
+            pending.photoTaken()
+        }
+        checkCurrentPhoto()
+    }
+
+    /** Try again on Check paused: checks the same photo again. */
+    fun tryAgain() {
+        if (checking || !checkPaused) return
         checkCurrentPhoto()
     }
 
@@ -162,6 +180,7 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
     fun skip() {
         val current = walk ?: return
         if (checking || current.current == null) return
+        pausedCheck = null
         updateWalk { it.skip() }
         if (current.isLast) finishWalk()
     }
@@ -174,31 +193,33 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
         if (current.isLast) finishWalk()
     }
 
-    /** Checks the current shot's photo off the main thread and records the answers through [updateWalk]. */
+    /**
+     * Checks the current shot's photo with Gemma off the main thread (the model is loaded first if
+     * needed) and records the answers and the model time through [updateWalk], only if the shot
+     * still holds that photo. A failed check records nothing and pauses the check instead.
+     */
     private fun checkCurrentPhoto() {
         val current = walk ?: return
         val index = current.currentIndex
         val shot = current.current ?: return
         val path = shot.photoPath ?: return
+        val app = getApplication<Application>()
+        pausedCheck = null
         checking = true
         viewModelScope.launch {
             try {
-                val start = System.nanoTime()
-                val answers = standInCheck(index)
-                val checkMillis = (System.nanoTime() - start) / 1_000_000
-                // Only for the photo it was made for, should the shot have changed meanwhile.
-                updateWalk { w ->
-                    if (w.shots.getOrNull(index)?.photoPath == path) w.recordCheck(answers, checkMillis, index) else w
+                val result = checkPhoto(app, Uri.fromFile(File(path)), shot.questions)
+                val answers = answersToRecord(result)
+                if (answers == null) {
+                    pausedCheck = PausedCheck(index, path)
+                } else {
+                    updateWalk { w ->
+                        if (w.shots.getOrNull(index)?.photoPath == path) w.recordCheck(answers, result.modelMs, index) else w
+                    }
                 }
             } finally {
                 checking = false
             }
         }
-    }
-
-    /** The stand-in check until PW-14 brings the model: waits two seconds, returns the sample answers. */
-    private suspend fun standInCheck(shotIndex: Int): List<Boolean> {
-        delay(STAND_IN_CHECK_MILLIS)
-        return standInAnswers(shotIndex)
     }
 }

@@ -14,12 +14,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
@@ -96,8 +98,7 @@ fun ProgressDots(count: Int, current: Int, modifier: Modifier = Modifier) {
 
 /**
  * A walk photo, decoded off the main thread at the size shown, cropped to fill [modifier]'s size.
- * Without a path, or while loading, or when the file cannot be read (the stand-in photo has no
- * file), a plain box stands in for it.
+ * Without a path, or while loading, or when the file cannot be read, a plain box stands in for it.
  */
 @Composable
 fun WalkPhoto(path: String?, modifier: Modifier = Modifier) {
@@ -153,5 +154,15 @@ fun CriterionRow(question: String, yes: Boolean, modifier: Modifier = Modifier) 
             modifier = Modifier.size(24.dp),
         )
         Text(question, style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+/** Keeps the screen on while this is in the composition, such as while a check runs. */
+@Composable
+fun KeepScreenOn() {
+    val view = LocalView.current
+    DisposableEffect(view) {
+        view.keepScreenOn = true
+        onDispose { view.keepScreenOn = false }
     }
 }
