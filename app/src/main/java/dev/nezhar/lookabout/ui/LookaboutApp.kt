@@ -66,6 +66,8 @@ fun LookaboutApp(noticeTaps: Int = 0, viewModel: LookaboutViewModel = viewModel(
                 shotIndex = endCheckIndex,
                 waitingForModel = viewModel.endCheckWaiting,
                 modelUnavailable = viewModel.modelUnavailable,
+                canShowResultsNow = viewModel.canShowResultsNow,
+                onShowResultsNow = viewModel::showResultsNow,
                 modifier = modifier,
             )
             screen == Screen.Walk && walk != null -> WalkScreen(

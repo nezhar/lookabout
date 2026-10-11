@@ -228,6 +228,24 @@ class WalkStepsTest {
     }
 
     @Test
+    fun aWaitingEndCheckRetriesAFailedLoadOnce() {
+        assertTrue(retriesModelLoad(modelFailed = true, alreadyRetried = false))
+        assertFalse(retriesModelLoad(modelFailed = true, alreadyRetried = true))
+        assertFalse(retriesModelLoad(modelFailed = false, alreadyRetried = false))
+        assertFalse(retriesModelLoad(modelFailed = false, alreadyRetried = true))
+    }
+
+    @Test
+    fun showResultsNowOnlyWhileWaitingForAnUnavailableModel() {
+        assertTrue(offersShowResultsNow(waiting = true, modelUnavailable = true))
+        // Loading or downloading: the model is on its way.
+        assertFalse(offersShowResultsNow(waiting = true, modelUnavailable = false))
+        // Checking already.
+        assertFalse(offersShowResultsNow(waiting = false, modelUnavailable = true))
+        assertFalse(offersShowResultsNow(waiting = false, modelUnavailable = false))
+    }
+
+    @Test
     fun theWaitNoteShowsOnlyForAMissingOrFailedModel() {
         assertNull(modelWaitNote(modelUnavailable = false))
         assertEquals(

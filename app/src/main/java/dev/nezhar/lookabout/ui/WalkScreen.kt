@@ -17,6 +17,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -129,6 +130,9 @@ fun WalkScreen(
  * @param waitingForModel true while the check waits for the model.
  * @param modelUnavailable true when the model is not on the phone or failed to load; a waiting
  *   check says so under the heading.
+ * @param canShowResultsNow true when Show results now shows: the check waits for a model that is
+ *   not on the phone or failed to load.
+ * @param onShowResultsNow stops the check and opens Summary.
  */
 @Composable
 fun EndCheckScreen(
@@ -137,6 +141,8 @@ fun EndCheckScreen(
     modifier: Modifier = Modifier,
     waitingForModel: Boolean = false,
     modelUnavailable: Boolean = false,
+    canShowResultsNow: Boolean = false,
+    onShowResultsNow: () -> Unit = {},
 ) {
     KeepScreenOn()
     val shot = walk.shots.getOrNull(shotIndex)
@@ -160,6 +166,11 @@ fun EndCheckScreen(
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+        if (canShowResultsNow) {
+            TextButton(onClick = onShowResultsNow) {
+                Text("Show results now", style = MaterialTheme.typography.titleMedium)
+            }
         }
         LinearProgressIndicator(
             progress = { endCheckProgress(walk, shotIndex) },
@@ -503,7 +514,13 @@ private fun EndCheckPreview() {
 private fun EndCheckWaitingPreview() {
     val walk = previewWalk().copy(checkAtEnd = true).withPreviewPhoto().copy(currentIndex = 5)
     LookaboutTheme {
-        EndCheckScreen(walk, shotIndex = 1, waitingForModel = true, modelUnavailable = true)
+        EndCheckScreen(
+            walk,
+            shotIndex = 1,
+            waitingForModel = true,
+            modelUnavailable = true,
+            canShowResultsNow = true,
+        )
     }
 }
 

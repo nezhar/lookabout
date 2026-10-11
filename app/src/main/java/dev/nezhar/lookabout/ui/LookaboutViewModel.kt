@@ -36,6 +36,8 @@ import dev.nezhar.lookabout.modelPath
 import dev.nezhar.lookabout.modelStart
 import dev.nezhar.lookabout.monthName
 import dev.nezhar.lookabout.offersCheckAgain
+import dev.nezhar.lookabout.offersShowResultsNow
+import dev.nezhar.lookabout.retriesModelLoad
 import dev.nezhar.lookabout.sunHere
 import dev.nezhar.lookabout.offersModelChoice
 import dev.nezhar.lookabout.saveModelChoice
@@ -602,6 +604,20 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
             return offersCheckAgain(current, endCheckRunning = endCheckIndex != null)
         }
 
+    /** True when the waiting end check offers Show results now: the model may never be ready. */
+    val canShowResultsNow: Boolean
+        get() = endCheckIndex != null && offersShowResultsNow(endCheckWaiting, modelUnavailable)
+
+    /**
+     * Show results now on the waiting end check: stops it and opens Summary, where Check again
+     * checks the photos once the model is ready.
+     */
+    fun showResultsNow() {
+        if (!canShowResultsNow) return
+        endCheckJob?.cancel()
+        showSummary()
+    }
+
     /**
      * Check again on Summary: runs the check at the end on the photos without a result; its
      * screen shows over Summary, which shows again when it is done.
@@ -612,7 +628,8 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /**
-     * The check at the end: waits until the model is ready (its screen says so meanwhile), then
+     * The check at the end: waits until the model is ready (its screen says so meanwhile, and a
+     * failed load is retried once through [loadModel]; Show results now leaves the wait), then
      * checks every photo without a check, one after another, with the same check as during a walk,
      * and records each result through [updateWalk] (so it is saved) if the shot still holds that
      * photo. A failed check leaves its shot unchecked and moves on. Then Summary opens. There is
@@ -629,11 +646,19 @@ class LookaboutViewModel(application: Application) : AndroidViewModel(applicatio
             try {
                 // A check before the model is ready would fail every photo at once. Nothing left
                 // to check needs no model: the walk goes straight on to Summary.
+                var retried = false
                 snapshotFlow {
                     val current = walk
-                    current == null || current.shotsToCheck.isEmpty() ||
+                    val ready = current == null || current.shotsToCheck.isEmpty() ||
                         canStartEndCheck(current, model == ModelState.Ready)
-                }.first { it }
+                    ready to (model is ModelState.Failed)
+                }.first { (ready, failed) ->
+                    if (!ready && retriesModelLoad(failed, retried)) {
+                        retried = true
+                        loadModel()
+                    }
+                    ready
+                }
                 endCheckWaiting = false
                 val queue = walk?.shotsToCheck.orEmpty()
                 for (index in queue) {

@@ -90,6 +90,21 @@ fun endCheckTitle(walk: Walk, shotIndex: Int, waiting: Boolean): String =
 fun modelWaitNote(modelUnavailable: Boolean): String? =
     if (modelUnavailable) "The model is not on the phone or failed to load. The check starts as soon as it is ready." else null
 
+/**
+ * True when the waiting end check should load the model again: the model failed to load
+ * ([modelFailed]) and this end check has not retried yet ([alreadyRetried]). It retries once only,
+ * so a model that keeps failing stays Failed.
+ */
+fun retriesModelLoad(modelFailed: Boolean, alreadyRetried: Boolean): Boolean =
+    modelFailed && !alreadyRetried
+
+/**
+ * True when the waiting end check offers Show results now: it waits for the model ([waiting]) and
+ * the model is not on the phone or failed to load ([modelUnavailable]), so it may never be ready.
+ */
+fun offersShowResultsNow(waiting: Boolean, modelUnavailable: Boolean): Boolean =
+    waiting && modelUnavailable
+
 /** A failed check: the shot at [shotIndex] and the photo the check was made for. */
 data class PausedCheck(val shotIndex: Int, val photoPath: String) {
     /** True when [shot], at [index], still holds the photo whose check failed and has no result. */
